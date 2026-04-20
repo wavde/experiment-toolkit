@@ -12,6 +12,8 @@ where mde is the minimum detectable effect in outcome units.
 
 from __future__ import annotations
 
+import math
+
 from scipy import stats
 
 
@@ -36,9 +38,6 @@ def sample_size_for_mde(
     z_beta = stats.norm.ppf(power)
 
     n = 2 * std_dev**2 * (z_alpha + z_beta) ** 2 / mde**2
-    # Round up — you can't have a fractional user.
-    import math
-
     return math.ceil(n)
 
 

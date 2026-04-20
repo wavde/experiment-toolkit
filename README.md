@@ -3,8 +3,7 @@
 > Small, well-tested utilities for online controlled experiments.
 
 ![CI](https://github.com/wavde/experiment-toolkit/actions/workflows/ci.yml/badge.svg)
-[![PyPI version](https://img.shields.io/pypi/v/experiment-toolkit.svg)](https://pypi.org/project/experiment-toolkit/)
-[![Python](https://img.shields.io/pypi/pyversions/experiment-toolkit.svg)](https://pypi.org/project/experiment-toolkit/)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## What's inside
@@ -21,14 +20,10 @@ Every function is tested, typed, and has a reference to the paper it implements.
 ## Install
 
 ```bash
-pip install experiment-toolkit
-```
-
-Or from source:
-
-```bash
 pip install git+https://github.com/wavde/experiment-toolkit.git
 ```
+
+A PyPI release is planned; installation via `pip install experiment-toolkit` will be documented once published.
 
 ## Quick start
 
@@ -48,9 +43,11 @@ p = msprt_pvalue(delta_hat=0.015, sigma=1.0, n_per_arm=5000, tau=0.05)
 
 ## CLI
 
+The CLI wraps `sample-size` and `mde`. The other modules (`cuped`, `ratio`, `sequential`) are library-only.
+
 ```bash
 experiment-toolkit sample-size --mde 0.02 --sd 1.0
-# Required per-arm sample size: 39,242
+# Required per-arm sample size: 39,244
 
 experiment-toolkit mde --n 10000 --sd 1.0
 # Detectable effect (MDE): 0.0396

@@ -11,7 +11,7 @@ def compute_theta(y: ArrayLike, x: ArrayLike) -> float:
     y_arr = np.asarray(y, dtype=float)
     x_arr = np.asarray(x, dtype=float)
     var_x = np.var(x_arr, ddof=1)
-    if var_x == 0:
+    if var_x < 1e-12:
         return 0.0
     return float(np.cov(y_arr, x_arr, ddof=1)[0, 1] / var_x)
 

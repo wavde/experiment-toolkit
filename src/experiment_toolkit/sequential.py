@@ -43,6 +43,11 @@ def msprt_pvalue(
     -------
     always-valid p-value, in [0, 1].
     """
+    delta_hat = float(delta_hat)
+    sigma = float(sigma)
+    n_per_arm = int(n_per_arm)
+    tau = float(tau)
+
     if sigma <= 0:
         raise ValueError("sigma must be positive")
     if n_per_arm <= 0:
