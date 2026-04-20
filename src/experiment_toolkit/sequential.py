@@ -51,12 +51,13 @@ def msprt_pvalue(
         raise ValueError("tau must be positive (the prior must be proper)")
 
     sigma2 = sigma**2
-    prior_scale = n_per_arm * tau**2 / 2
-    shrinkage = prior_scale / (sigma2 + prior_scale)
+    # Variance of delta_hat under the null: V = 2*sigma^2 / n_per_arm
+    v = 2 * sigma2 / n_per_arm
+    shrinkage = tau**2 / (v + tau**2)
 
     log_lambda = (
-        0.5 * np.log(sigma2 / (sigma2 + prior_scale))
-        + (n_per_arm * delta_hat**2) / (2 * sigma2) * shrinkage
+        0.5 * np.log(v / (v + tau**2))
+        + (delta_hat**2 / (2 * v)) * shrinkage
     )
     # p = min(1, 1 / Lambda) => -log(p) = min(0, log(Lambda))
     p = float(min(1.0, np.exp(-log_lambda)))
