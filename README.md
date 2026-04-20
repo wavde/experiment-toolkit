@@ -7,6 +7,8 @@
 [![Python](https://img.shields.io/pypi/pyversions/experiment-toolkit.svg)](https://pypi.org/project/experiment-toolkit/)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
 
+![hero](docs/hero.png)
+
 ## What's inside
 
 | Module | Purpose |
