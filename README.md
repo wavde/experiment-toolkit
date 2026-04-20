@@ -3,7 +3,8 @@
 > Small, well-tested utilities for online controlled experiments.
 
 ![CI](https://github.com/wavde/experiment-toolkit/actions/workflows/ci.yml/badge.svg)
-![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
+[![PyPI version](https://img.shields.io/pypi/v/experiment-toolkit.svg)](https://pypi.org/project/experiment-toolkit/)
+[![Python](https://img.shields.io/pypi/pyversions/experiment-toolkit.svg)](https://pypi.org/project/experiment-toolkit/)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## What's inside
@@ -20,7 +21,12 @@ Every function is tested, typed, and has a reference to the paper it implements.
 ## Install
 
 ```bash
-# from source (PyPI release TBD)
+pip install experiment-toolkit
+```
+
+Or from source:
+
+```bash
 pip install git+https://github.com/wavde/experiment-toolkit.git
 ```
 

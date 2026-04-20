@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 authors = [{ name = "Tejas Wavde" }]
 keywords = ["experimentation", "ab-testing", "causal-inference", "statistics"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
