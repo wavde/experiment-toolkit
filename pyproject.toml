@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "experiment-toolkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Small, well-tested utilities for online controlled experiments: sample size, CUPED, sequential testing, delta-method variance."
 readme = "README.md"
 license = { file = "LICENSE" }

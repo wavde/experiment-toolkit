@@ -13,10 +13,12 @@
 
 | Module | Purpose |
 |--------|---------|
-| `sample_size` | Required per-arm sample size for a given MDE, and the inverse |
+| `sample_size` | Per-arm sample size / MDE, CUPED-aware (`rho` kwarg) |
 | `cuped` | Deng et al. (2013) CUPED variance reduction |
 | `ratio` | Delta-method variance for ratio metrics (revenue/session, etc.) |
-| `sequential` | mSPRT always-valid p-values for peeking-robust experiments |
+| `sequential` | mSPRT always-valid p-values, with optional CUPED compounding |
+| `cs_did` | Callaway & Sant'Anna (2021) staggered DiD, robust to heterogeneous effects |
+| `sensitivity` | E-value and Rosenbaum bounds for observational-causal sensitivity |
 
 Every function is tested, typed, and has a reference to the paper it implements.
 
