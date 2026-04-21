@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "ruff>=0.3", "mypy>=1.8"]
+dev = ["pytest>=7", "ruff>=0.3", "mypy>=1.8", "matplotlib>=3.8"]
 
 [project.urls]
 Homepage = "https://github.com/wavde/experiment-toolkit"
