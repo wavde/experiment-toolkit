@@ -9,18 +9,22 @@
 
 ![hero](docs/hero.png)
 
-## What's inside
+A compact Python package covering the calculations that come up in everyday experimentation work: sample sizing, variance reduction, sequential tests, ratio-metric variance, staggered DiD, and sensitivity analysis for observational designs. Each function implements a specific result from the literature and cites it.
+
+Intended audience: analysts, data scientists, and experimentation platform engineers who want a small, inspectable reference implementation rather than a framework.
+
+## Modules
 
 | Module | Purpose |
 |--------|---------|
-| `sample_size` | Per-arm sample size / MDE, CUPED-aware (`rho` kwarg) |
+| `sample_size` | Per-arm sample size and MDE, CUPED-aware (`rho` keyword) |
 | `cuped` | Deng et al. (2013) CUPED variance reduction |
-| `ratio` | Delta-method variance for ratio metrics (revenue/session, etc.) |
+| `ratio` | Delta-method variance for ratio metrics (revenue per session, etc.) |
 | `sequential` | mSPRT always-valid p-values, with optional CUPED compounding |
-| `cs_did` | Callaway & Sant'Anna (2021) staggered DiD, robust to heterogeneous effects |
-| `sensitivity` | E-value and Rosenbaum bounds for observational-causal sensitivity |
+| `cs_did` | Callaway & Sant'Anna (2021) staggered DiD, robust to heterogeneous cohort effects |
+| `sensitivity` | E-value (VanderWeele & Ding) and Rosenbaum bounds |
 
-Every function is tested, typed, and has a reference to the paper it implements.
+Every function is typed, tested, and has a paper reference in its docstring.
 
 ## Install
 
@@ -39,20 +43,20 @@ pip install git+https://github.com/wavde/experiment-toolkit.git
 ```python
 from experiment_toolkit import sample_size_for_mde, apply_cuped, msprt_pvalue
 
-# How many users do I need per arm to detect a 2% lift (sd=1.0)?
+# Per-arm sample size to detect a 2% lift at sd = 1.0
 n = sample_size_for_mde(mde=0.02, std_dev=1.0, alpha=0.05, power=0.80)
 # ~39,000 per arm
 
-# Apply CUPED with a pre-experiment covariate
+# CUPED adjustment with a pre-experiment covariate
 y_adj = apply_cuped(y, pre_period_y)
 
-# Always-valid p-value — safe to peek
+# Always-valid p-value, safe to peek
 p = msprt_pvalue(delta_hat=0.015, sigma=1.0, n_per_arm=5000, tau=0.05)
 ```
 
 ## CLI
 
-The CLI wraps `sample-size` and `mde`. The other modules (`cuped`, `ratio`, `sequential`) are library-only.
+The CLI exposes `sample-size` and `mde`. The other modules are library-only.
 
 ```bash
 experiment-toolkit sample-size --mde 0.02 --sd 1.0
@@ -61,6 +65,10 @@ experiment-toolkit sample-size --mde 0.02 --sd 1.0
 experiment-toolkit mde --n 10000 --sd 1.0
 # Detectable effect (MDE): 0.0396
 ```
+
+## Out of scope
+
+Not in this package: a bandit framework, a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
 
 ## Development
 
@@ -72,11 +80,13 @@ ruff check .
 
 ## References
 
-- Deng, Xu, Kohavi, Walker (2013) — CUPED
-- Deng, Knoblich, Lu (2018) — Delta Method in Metric Analytics
-- Johari, Pekelis, Walsh (2015) — Always Valid Inference
-- Kohavi, Tang, Xu (2020) — *Trustworthy Online Controlled Experiments*
+- Deng, Xu, Kohavi, Walker (2013). CUPED.
+- Deng, Knoblich, Lu (2018). Delta method in metric analytics.
+- Johari, Pekelis, Walsh (2015). Always-valid inference.
+- Callaway & Sant'Anna (2021). Difference-in-differences with multiple time periods.
+- VanderWeele & Ding (2017). Sensitivity analysis in observational research.
+- Kohavi, Tang, Xu (2020). *Trustworthy Online Controlled Experiments.*
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
