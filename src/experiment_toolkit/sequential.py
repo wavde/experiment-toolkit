@@ -106,9 +106,13 @@ def msprt_cuped_pvalue(
     y_t, y_c : streamed outcomes for the treatment and control arms.
     x_t, x_c : pre-experiment covariates for the same users (same length).
     n_per_arm : per-arm sample size at the peek time. If ``None``, uses the
-        length of ``y_t`` / ``y_c`` (must be equal).
-    tau : prior SD for the effect; defaults to SD of the CUPED-adjusted
-        outcome on the current peek data.
+        length of ``y_t`` / ``y_c`` (must be equal). When supplied, it must be
+        in ``(0, min(len(y_t), len(y_c)))`` and both arms must have equal
+        length so the slice is well defined.
+    tau : prior SD for the effect. **Required**: the mixing prior must be fixed
+        in advance of looking at the data, otherwise the always-valid Type-I
+        guarantee is lost. Choose ``tau`` from the smallest effect worth
+        detecting, not from the observed outcome SD.
     theta : optional pre-computed CUPED coefficient. When ``None``, theta
         is estimated from the pooled data in this call.
 
@@ -116,6 +120,13 @@ def msprt_cuped_pvalue(
     -------
     always-valid p-value, in [0, 1], computed on the CUPED-adjusted outcome.
     """
+    if tau is None:
+        raise ValueError(
+            "tau is required: the mSPRT mixing prior must be fixed before "
+            "looking at the data to keep the always-valid guarantee. Set it "
+            "from the smallest effect worth detecting (e.g. tau=mde)."
+        )
+
     y_t_arr = np.asarray(y_t, dtype=float)
     y_c_arr = np.asarray(y_c, dtype=float)
     x_t_arr = np.asarray(x_t, dtype=float)
@@ -123,10 +134,21 @@ def msprt_cuped_pvalue(
     if y_t_arr.shape != x_t_arr.shape or y_c_arr.shape != x_c_arr.shape:
         raise ValueError("x_* arrays must match y_* shapes")
 
+    if y_t_arr.ndim != 1 or y_c_arr.ndim != 1:
+        raise ValueError("y_*/x_* must be 1-D arrays")
+
     if n_per_arm is None:
         if len(y_t_arr) != len(y_c_arr):
             raise ValueError("arms have unequal length; pass n_per_arm explicitly")
         n_per_arm = int(len(y_t_arr))
+    else:
+        n_per_arm = int(n_per_arm)
+        max_n = min(len(y_t_arr), len(y_c_arr))
+        if not 0 < n_per_arm <= max_n:
+            raise ValueError(
+                f"n_per_arm must be in (0, {max_n}] given the array lengths, "
+                f"got {n_per_arm}"
+            )
 
     yt = y_t_arr[:n_per_arm]
     yc = y_c_arr[:n_per_arm]
@@ -146,7 +168,5 @@ def msprt_cuped_pvalue(
     pooled_sd = float(np.concatenate([yt_adj, yc_adj]).std(ddof=1))
     if pooled_sd <= 0:
         return 1.0
-    if tau is None:
-        tau = pooled_sd
 
     return msprt_pvalue(delta_hat=delta_hat, sigma=pooled_sd, n_per_arm=n_per_arm, tau=tau)

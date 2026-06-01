@@ -20,7 +20,7 @@ from experiment_toolkit.sensitivity import (
 )
 from experiment_toolkit.sequential import msprt_cuped_pvalue, msprt_pvalue
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "CSResult",

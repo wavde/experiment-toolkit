@@ -7,9 +7,9 @@
 [![Python](https://img.shields.io/pypi/pyversions/experiment-toolkit.svg)](https://pypi.org/project/experiment-toolkit/)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
 
-![hero](docs/hero.png)
+![hero](https://raw.githubusercontent.com/wavde/experiment-toolkit/main/docs/hero.png)
 
-A compact Python package covering the calculations that come up in everyday experimentation work: sample sizing, variance reduction, sequential tests, ratio-metric variance, staggered DiD, and sensitivity analysis for observational designs. Each function implements a specific result from the literature and cites it.
+A compact Python package covering the calculations that come up in everyday experimentation work: sample sizing, variance reduction, sequential tests, ratio-metric variance, staggered DiD, and sensitivity analysis for observational designs. The implementations follow standard results from the experimentation and causal-inference literature (referenced in the docstrings and below).
 
 Intended audience: analysts, data scientists, and experimentation platform engineers who want a small, inspectable reference implementation rather than a framework.
 
@@ -24,7 +24,7 @@ Intended audience: analysts, data scientists, and experimentation platform engin
 | `cs_did` | Callaway & Sant'Anna (2021) staggered DiD, robust to heterogeneous cohort effects |
 | `sensitivity` | E-value (VanderWeele & Ding) and Rosenbaum bounds |
 
-Every function is typed, tested, and has a paper reference in its docstring.
+The public API is typed (the package ships a `py.typed` marker) and unit-tested, and the key methods cite their source in the module docstrings.
 
 ## Install
 

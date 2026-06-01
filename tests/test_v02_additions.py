@@ -1,9 +1,11 @@
 import numpy as np
 import pytest
+from scipy import stats
 
 from experiment_toolkit import (
     CSResult,
     EValueResult,
+    apply_cuped,
     cs_staggered_att,
     cuped_sample_size_summary,
     e_value,
@@ -115,13 +117,101 @@ def test_e_value_smd_conversion():
 
 # -- Rosenbaum bounds -----------------------------------------------------
 
-def test_rosenbaum_bounds_gamma_1_matches_classical():
+def test_rosenbaum_bounds_gamma_1_matches_normal_approx_signed_rank():
     rng = np.random.default_rng(0)
     d = rng.normal(0.3, 1.0, size=50)
     rows = rosenbaum_wilcoxon_bounds(d, gammas=[1.0, 2.0])
     assert rows[0]["gamma"] == 1.0
     # monotone: gamma=2 worse than gamma=1
     assert rows[1]["p_upper"] > rows[0]["p_upper"]
+    # At gamma=1 the bound equals the normal-approximation one-sided
+    # signed-rank p-value computed independently here.
+    nz = d[d != 0]
+    ranks = stats.rankdata(np.abs(nz))
+    w_plus = ranks[nz > 0].sum()
+    mean = 0.5 * ranks.sum()
+    var = 0.25 * (ranks**2).sum()
+    z = (w_plus - mean) / np.sqrt(var)
+    expected = float(1.0 - stats.norm.cdf(z))
+    assert rows[0]["p_upper"] == pytest.approx(expected, rel=1e-9)
+
+
+# -- regression tests for v0.3 correctness fixes --------------------------
+
+def test_msprt_cuped_requires_tau():
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=100)
+    with pytest.raises(ValueError, match="tau is required"):
+        msprt_cuped_pvalue(a, a, a, a)
+
+
+def test_msprt_cuped_rejects_bad_n_per_arm():
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=100)
+    with pytest.raises(ValueError, match="n_per_arm"):
+        msprt_cuped_pvalue(a, a, a, a, n_per_arm=500, tau=1.0)
+
+
+def test_sample_size_rejects_unit_rho():
+    with pytest.raises(ValueError):
+        sample_size_for_mde(mde=0.1, std_dev=1.0, rho=1.0)
+    with pytest.raises(ValueError):
+        mde_for_n(n_per_arm=1000, std_dev=1.0, rho=-1.0)
+
+
+def test_mde_for_n_validates_alpha_power():
+    with pytest.raises(ValueError):
+        mde_for_n(n_per_arm=1000, std_dev=1.0, alpha=0.0)
+    with pytest.raises(ValueError):
+        mde_for_n(n_per_arm=1000, std_dev=1.0, power=1.0)
+
+
+def test_e_value_protective_uses_upper_ci_bound():
+    # Protective effect RR=0.5, CI [0.3, 0.8]; the null-side bound is 0.8.
+    res = e_value(point_estimate=0.5, ci_low=0.3, ci_high=0.8)
+    assert res.rr_ci == pytest.approx(0.8)
+    # E-value of 0.8 (i.e. 1/0.8 = 1.25) is the standard formula.
+    inv = 1 / 0.8
+    assert res.e_value_ci == pytest.approx(inv + np.sqrt(inv * (inv - 1)), rel=1e-9)
+
+
+def test_e_value_protective_ci_crossing_null_returns_one():
+    res = e_value(point_estimate=0.7, ci_low=0.4, ci_high=1.2)
+    assert res.e_value_ci == 1.0
+
+
+def test_e_value_or_requires_baseline_risk():
+    with pytest.raises(ValueError, match="p0"):
+        e_value(point_estimate=2.0, kind="or")
+    res = e_value(point_estimate=2.0, kind="or", p0=0.2)
+    assert res.rr_observed == pytest.approx(2.0 / ((1 - 0.2) + 0.2 * 2.0))
+
+
+def test_e_value_negative_smd_is_protective():
+    res = e_value(point_estimate=-0.5, kind="smd")
+    assert res.rr_observed == pytest.approx(np.exp(0.91 * -0.5))
+    assert res.e_value_point > 1.0
+
+
+def test_cuped_rejects_mismatched_shapes():
+    with pytest.raises(ValueError):
+        apply_cuped([1.0, 2.0, 3.0], [1.0, 2.0])
+
+
+def test_cs_rejects_nonconstant_cohort():
+    panel = simulate_staggered_panel(
+        cohort_sizes={6: 5}, n_never_treated=5, n_periods=10, seed=0
+    )
+    cohort = panel["cohort"].copy()
+    cohort[0] = 99  # corrupt one row's cohort
+    with pytest.raises(ValueError, match="constant within unit"):
+        cs_staggered_att(
+            unit=panel["unit"],
+            period=panel["period"],
+            y=panel["y"],
+            cohort=cohort,
+            n_bootstrap=10,
+        )
 
 
 def test_rosenbaum_gamma_threshold_bisection():

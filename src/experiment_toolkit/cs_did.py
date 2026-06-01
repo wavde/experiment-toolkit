@@ -133,12 +133,17 @@ def _to_wide(
     if np.isnan(y_mat).any():
         raise ValueError("panel is unbalanced; every (unit, period) must be present")
     cohort_per_unit = np.zeros(n_u, dtype=int)
-    # cohort is constant within unit — take the first occurrence
+    # cohort must be constant within unit; verify rather than assume.
     seen = np.zeros(n_u, dtype=bool)
     for u_idx, c in zip(unit_idx, cohort, strict=False):
         if not seen[u_idx]:
             cohort_per_unit[u_idx] = c
             seen[u_idx] = True
+        elif cohort_per_unit[u_idx] != c:
+            raise ValueError(
+                f"cohort is not constant within unit {unit_ids[u_idx]!r} "
+                f"({cohort_per_unit[u_idx]} vs {c})"
+            )
     return unit_ids, period_grid, y_mat, cohort_per_unit
 
 
@@ -211,22 +216,30 @@ def cs_staggered_att(
         raise ValueError("No identifiable (g, t) cells — check cohort/period coding.")
 
     rng = np.random.default_rng(seed)
-    boot_gt: dict[tuple[int, int], list[float]] = {k: [] for k in point_gt}
-    for _ in range(n_bootstrap):
+    cell_keys = list(point_gt.keys())
+    n_cells = len(cell_keys)
+    key_to_col = {k: j for j, k in enumerate(cell_keys)}
+    # Aligned bootstrap matrix: row = replicate, col = (g, t) cell.
+    # NaN marks cells not identified in a given replicate, so aggregation
+    # within a replicate keeps cells aligned to the same resample.
+    boot_mat = np.full((n_bootstrap, n_cells), np.nan, dtype=float)
+    for r in range(n_bootstrap):
         idx = rng.integers(0, n_units, size=n_units)
         y_boot = y_mat[idx]
         c_boot = cohort_per_unit[idx]
         b = _cs_point_estimates(y_boot, c_boot, period_grid, cohorts)
-        for k in boot_gt:
-            if k in b:
-                boot_gt[k].append(b[k])
+        for k, val in b.items():
+            boot_mat[r, key_to_col[k]] = val
+
+    def _nanstd(values: np.ndarray) -> float:
+        v = values[np.isfinite(values)]
+        return float(v.std(ddof=1)) if len(v) > 1 else float("nan")
 
     z = float(stats.norm.ppf(1 - alpha / 2))
 
     gt_rows: list[dict[str, Any]] = []
     for (g, t), point in point_gt.items():
-        boots = np.asarray(boot_gt[(g, t)])
-        se = float(boots.std(ddof=1)) if len(boots) > 1 else float("nan")
+        se = _nanstd(boot_mat[:, key_to_col[(g, t)]])
         gt_rows.append(
             {
                 "cohort": g,
@@ -242,24 +255,21 @@ def cs_staggered_att(
         )
     gt_rows.sort(key=lambda r: (r["cohort"], r["period"]))
 
-    # Event-study aggregation
+    # Event-study aggregation: average aligned replicates across the cells
+    # sharing each relative time, then take the SD across replicates.
     es_points: dict[int, list[float]] = {}
-    es_boots: dict[int, list[list[float]]] = {}
+    es_cols: dict[int, list[int]] = {}
     for (g, t), point in point_gt.items():
         es_points.setdefault(t - g, []).append(point)
-        es_boots.setdefault(t - g, []).append(boot_gt[(g, t)])
+        es_cols.setdefault(t - g, []).append(key_to_col[(g, t)])
 
     es_rows: list[dict[str, Any]] = []
     for e in sorted(es_points):
         att_e = float(np.mean(es_points[e]))
-        valid = [np.asarray(b) for b in es_boots[e] if len(b) > 1]
-        if valid:
-            min_len = min(len(v) for v in valid)
-            stacked = np.vstack([v[:min_len] for v in valid])
-            replicate_means = stacked.mean(axis=0)
-            se_e = float(replicate_means.std(ddof=1))
-        else:
-            se_e = float("nan")
+        cols = es_cols[e]
+        with np.errstate(invalid="ignore"):
+            replicate_means = np.nanmean(boot_mat[:, cols], axis=1)
+        se_e = _nanstd(replicate_means)
         es_rows.append(
             {
                 "relative_time": e,
@@ -271,14 +281,9 @@ def cs_staggered_att(
         )
 
     overall_point = float(np.mean(list(point_gt.values())))
-    valid_keys = [k for k in point_gt if len(boot_gt[k]) > 1]
-    if valid_keys:
-        min_len = min(len(boot_gt[k]) for k in valid_keys)
-        boot_mat = np.vstack([np.asarray(boot_gt[k][:min_len]) for k in valid_keys])
-        overall_replicates = boot_mat.mean(axis=0)
-        overall_se = float(overall_replicates.std(ddof=1))
-    else:
-        overall_se = float("nan")
+    with np.errstate(invalid="ignore"):
+        overall_replicates = np.nanmean(boot_mat, axis=1)
+    overall_se = _nanstd(overall_replicates)
 
     return CSResult(
         group_time_att=gt_rows,

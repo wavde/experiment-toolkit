@@ -98,25 +98,27 @@ def test_msprt_pvalue_capped_at_one():
 
 
 def test_msprt_always_valid_type1_error():
-    """Under the null and peeking at every step, naive z-test rejects often;
-    mSPRT should reject rarely (alpha-controlled at any stopping time)."""
+    """Under the null and peeking at every step, the always-valid p-value must
+    control Type-I error at any stopping time. With a fixed (known) sigma the
+    only randomness is the data, so the cumulative rejection rate should sit
+    comfortably below alpha."""
     rng = np.random.default_rng(42)
-    n_trials = 200
+    n_trials = 400
+    sigma = 1.0  # known/fixed; the prior tau is fixed in advance too
     rejections = 0
     for _ in range(n_trials):
-        # Simulate one null experiment with peeking
         max_n = 2000
-        treatment = rng.normal(0, 1, size=max_n)
-        control = rng.normal(0, 1, size=max_n)
+        treatment = rng.normal(0, sigma, size=max_n)
+        control = rng.normal(0, sigma, size=max_n)
         rejected = False
         for n in range(50, max_n + 1, 50):
             delta = treatment[:n].mean() - control[:n].mean()
-            sigma = np.std(np.concatenate([treatment[:n], control[:n]]), ddof=1)
             p = msprt_pvalue(delta, sigma, n, tau=0.1)
             if p < 0.05:
                 rejected = True
                 break
         if rejected:
             rejections += 1
-    # Always-valid p-values control Type-I error; expect < 10% even with peeking
-    assert rejections / n_trials < 0.10
+    # Always-valid guarantee bounds this by alpha=0.05 at every stopping time;
+    # allow a little Monte-Carlo slack over 400 trials.
+    assert rejections / n_trials < 0.06

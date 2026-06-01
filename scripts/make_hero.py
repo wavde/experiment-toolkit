@@ -14,7 +14,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy import stats
+
+from experiment_toolkit import sample_size_for_mde
 
 RNG = np.random.default_rng(7)
 OUT = Path(__file__).resolve().parents[1] / "docs" / "hero.png"
@@ -23,10 +24,11 @@ OUT = Path(__file__).resolve().parents[1] / "docs" / "hero.png"
 def sample_size_curve(ax: plt.Axes) -> None:
     baseline = 0.10
     mdes_rel = np.linspace(0.01, 0.10, 50)
-    sigma2 = baseline * (1 - baseline)
-    z_alpha = stats.norm.ppf(1 - 0.025)
-    z_beta = stats.norm.ppf(0.80)
-    n_per_arm = 2 * sigma2 * (z_alpha + z_beta) ** 2 / (baseline * mdes_rel) ** 2
+    sigma = float(np.sqrt(baseline * (1 - baseline)))
+    n_per_arm = np.array(
+        [sample_size_for_mde(mde=baseline * m, std_dev=sigma) for m in mdes_rel],
+        dtype=float,
+    )
 
     ax.plot(mdes_rel * 100, n_per_arm / 1000, lw=2.2, color="#1f77b4")
     ax.set_xlabel("Minimum detectable effect (% relative)")

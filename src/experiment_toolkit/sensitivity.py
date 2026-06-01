@@ -38,9 +38,10 @@ class EValueResult:
     """Structured result from :func:`e_value`."""
 
     point_estimate: float
-    lower_ci: float | None
+    ci_low: float | None
+    ci_high: float | None
     rr_observed: float
-    rr_lower: float | None
+    rr_ci: float | None
     e_value_point: float
     e_value_ci: float | None
 
@@ -53,10 +54,13 @@ class EValueResult:
 
 def e_value(
     point_estimate: float,
-    lower_ci: float | None = None,
+    ci_low: float | None = None,
+    ci_high: float | None = None,
     kind: str = "rr",
     sd: float | None = None,
     rare: bool = False,
+    p0: float | None = None,
+    lower_ci: float | None = None,
 ) -> EValueResult:
     """
     Compute the E-value for an observed effect estimate.
@@ -67,30 +71,43 @@ def e_value(
         The observed effect. Interpretation depends on ``kind``:
 
         - ``"rr"``: a risk ratio (must be > 0).
-        - ``"or"``: an odds ratio. If ``rare=True``, it is used as-is;
-          otherwise approximated to a risk ratio via
-          ``RR ~= OR / ((1 - p0) + p0 * OR)`` with ``p0 = 0.1`` (a neutral
-          prior baseline). For memo-level sensitivity this is adequate;
-          for publication-grade work supply ``kind="rr"`` directly.
-        - ``"smd"``: a standardised mean difference (Cohen's d). Converted
-          to an approximate risk ratio via
-          ``RR ~= exp(0.91 * d)`` (VanderWeele & Ding 2017).
+        - ``"or"``: an odds ratio (must be > 0). If ``rare=True`` it is used
+          as-is; otherwise it is converted to a risk ratio via
+          ``RR = OR / ((1 - p0) + p0 * OR)`` and you **must** supply ``p0``,
+          the baseline outcome risk in the unexposed group. There is no
+          publication-grade default for ``p0`` — it is outcome-specific.
+        - ``"smd"``: a standardised mean difference (Cohen's d), which may be
+          negative (a protective effect). Converted to an approximate risk
+          ratio via ``RR = exp(0.91 * d)`` (VanderWeele & Ding 2017).
 
-    lower_ci : optional lower bound of the CI on the *same scale* as
-        ``point_estimate``. Used to compute the E-value for the CI, which
-        is typically what gets reported.
-    sd : required only for ``kind="smd"`` to rescale the lower CI correctly;
-        callers usually pass ``sd=1`` because Cohen's d is already scaled.
+    ci_low, ci_high : optional bounds of the confidence interval on the *same
+        scale* as ``point_estimate``. The E-value for the CI is computed from
+        the bound closest to the null (the lower bound for a harmful effect,
+        ``RR > 1``; the upper bound for a protective effect, ``RR < 1``).
+    lower_ci : deprecated alias for ``ci_low``, kept for backwards
+        compatibility.
+    sd : reserved for ``kind="smd"``; Cohen's d is already standardised so
+        callers typically need not set this.
     rare : whether the outcome is rare (only matters for ``kind="or"``).
 
     Returns
     -------
     EValueResult
     """
-    if point_estimate <= 0:
-        raise ValueError("point_estimate must be positive")
+    if lower_ci is not None and ci_low is None:
+        ci_low = lower_ci
     if kind not in {"rr", "or", "smd"}:
         raise ValueError(f"kind must be one of rr/or/smd, got {kind!r}")
+    if kind in {"rr", "or"} and point_estimate <= 0:
+        raise ValueError("point_estimate must be positive for kind='rr'/'or'")
+    if kind == "or" and not rare:
+        if p0 is None:
+            raise ValueError(
+                "kind='or' with rare=False needs p0 (baseline outcome risk in "
+                "the unexposed group) to convert OR to RR; pass p0 or rare=True."
+            )
+        if not 0 < p0 < 1:
+            raise ValueError("p0 must be in (0, 1)")
 
     def _to_rr(x: float) -> float:
         if kind == "rr":
@@ -98,32 +115,36 @@ def e_value(
         if kind == "or":
             if rare:
                 return x
-            p0 = 0.1
             return x / ((1 - p0) + p0 * x)
         return math.exp(0.91 * x)
 
     rr = _to_rr(point_estimate)
-    rr_l = _to_rr(lower_ci) if lower_ci is not None else None
 
     def _ev(rr_val: float) -> float:
         rr_val = rr_val if rr_val >= 1 else 1 / rr_val
         return rr_val + math.sqrt(rr_val * (rr_val - 1))
 
     ev_point = _ev(rr)
+
+    # Pick the CI bound closest to the null (RR = 1) for the direction observed.
+    null_side = ci_low if rr >= 1 else ci_high
+    rr_ci = _to_rr(null_side) if null_side is not None else None
+
     ev_ci: float | None
-    if rr_l is None:
+    if rr_ci is None:
         ev_ci = None
-    elif (rr > 1 and rr_l <= 1) or (rr < 1 and rr_l >= 1):
-        # CI crosses the null -> the lower bound IS the null
+    elif (rr > 1 and rr_ci <= 1) or (rr < 1 and rr_ci >= 1):
+        # CI crosses the null -> the relevant bound IS the null
         ev_ci = 1.0
     else:
-        ev_ci = _ev(rr_l)
+        ev_ci = _ev(rr_ci)
 
     return EValueResult(
         point_estimate=point_estimate,
-        lower_ci=lower_ci,
+        ci_low=ci_low,
+        ci_high=ci_high,
         rr_observed=rr,
-        rr_lower=rr_l,
+        rr_ci=rr_ci,
         e_value_point=ev_point,
         e_value_ci=ev_ci,
     )
@@ -133,9 +154,12 @@ def _wilcoxon_signed_rank_one_sided_p(differences: np.ndarray, gamma: float) -> 
     """Upper-bound one-sided p-value under a hidden bias of size ``gamma``.
 
     Implements the Rosenbaum (2002) bounding argument for the Wilcoxon
-    signed-rank statistic. With gamma=1 this reduces to the usual Wilcoxon
-    p-value; larger gamma widens the null distribution, raising the p-value.
-    Ties are ranked by average rank; zero differences are dropped.
+    signed-rank statistic, using a normal approximation to the null
+    distribution of the signed-rank sum. At ``gamma=1`` this is the
+    large-sample normal approximation to the usual one-sided Wilcoxon
+    signed-rank p-value (not the exact small-sample value); larger gamma
+    widens the null distribution, raising the p-value. Ties are ranked by
+    average rank; zero differences are dropped.
     """
     d = differences[differences != 0]
     if len(d) == 0:

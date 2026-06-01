@@ -40,8 +40,8 @@ def sample_size_for_mde(
         raise ValueError("alpha must be in (0, 1)")
     if not 0 < power < 1:
         raise ValueError("power must be in (0, 1)")
-    if not -1 <= rho <= 1:
-        raise ValueError("rho must be in [-1, 1]")
+    if not -1 < rho < 1:
+        raise ValueError("rho must be in (-1, 1)")
 
     z_alpha = stats.norm.ppf(1 - alpha / 2) if two_sided else stats.norm.ppf(1 - alpha)
     z_beta = stats.norm.ppf(power)
@@ -65,8 +65,12 @@ def mde_for_n(
         raise ValueError("n_per_arm must be positive")
     if std_dev <= 0:
         raise ValueError("std_dev must be positive")
-    if not -1 <= rho <= 1:
-        raise ValueError("rho must be in [-1, 1]")
+    if not 0 < alpha < 1:
+        raise ValueError("alpha must be in (0, 1)")
+    if not 0 < power < 1:
+        raise ValueError("power must be in (0, 1)")
+    if not -1 < rho < 1:
+        raise ValueError("rho must be in (-1, 1)")
 
     z_alpha = stats.norm.ppf(1 - alpha / 2) if two_sided else stats.norm.ppf(1 - alpha)
     z_beta = stats.norm.ppf(power)
