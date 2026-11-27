@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `llm_judge`: A/B tests whose primary metric is scored by an LLM judge.
+  Simulates binary true quality and a judge with per-arm sensitivity /
+  specificity, which allows differential error between arms. Provides the naive
+  judge-only analysis (`naive_judge_diff`) and PPI / PPI++ correction
+  (`ppi_mean_diff`; Angelopoulos et al. 2023) that uses a small human-labeled
+  sample from each arm. Also adds closed-form helpers for the expected naive
+  bias, SEs, rejection rates and sample-size inflation.
+- `scripts/llm_judge_sim.py`: seeded, single-command simulation that writes
+  `docs/llm_judge_results.md` and `docs/llm_judge.png`, with every simulated
+  number shown next to its closed-form value. Known-answer and Type-I tests
+  live in `tests/test_llm_judge.py`.
+
 ## [0.2.0] - 2026-04-19
 
 ### Added
