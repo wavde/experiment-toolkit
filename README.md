@@ -123,6 +123,8 @@ The script uses a fixed seed and writes [`docs/ppi_covariates_results.md`](docs/
 
 The covariate's gain depends on how much it adds beyond the judge. It is largest when the judge is weak, small when the judge is strong, and capped when labels are a large share of each arm.
 
+Write-up, with the decision rule: [A covariate stacks on the judge, but a better judge beats both](https://github.com/wavde/wavde/blob/main/writing/ppi-with-covariates-label-budget.md).
+
 ## Out of scope
 
 Not in this package: a bandit framework, a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
