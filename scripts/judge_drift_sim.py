@@ -205,7 +205,13 @@ def main() -> None:
         f"Seed `{SEED}`. No model API calls. True quality is binary with control rate "
         f"{P_CONTROL:.2f}; the true effect is +{EFFECT:.2f} or 0 and doesn't change over "
         "time. The old judge has sensitivity = specificity = 0.85 on both arms. Halfway "
-        "through the test, both arms switch to a new judge. Every unit is judged; human "
+        "through the test, both arms switch to a new judge (sensitivity/specificity): "
+        + "; ".join(
+            f"*{name}*: treatment {u.new_t.sensitivity:.2f}/{u.new_t.specificity:.2f}, "
+            f"control {u.new_c.sensitivity:.2f}/{u.new_c.specificity:.2f}"
+            for name, u in UPGRADES.items()
+        )
+        + ". Every unit is judged; human "
         "labels are the same budget for every PPI++ variant. Values in parentheses are "
         "closed-form answers from `experiment_toolkit.judge_drift` (large-sample for "
         "\"labels before upgrade only\"). PPI++ variants with labels spread across the test "

@@ -141,6 +141,8 @@ The script uses a fixed seed and writes [`docs/judge_drift_results.md`](docs/jud
 - It also biases PPI++ if all the human labels were collected before the upgrade.
 - PPI++ with labels spread across the test, or stratified by judge version, stays unbiased.
 
+Write-up, with the decision rule: [Upgrading the judge mid-test is safe only if your labels know about it](https://github.com/wavde/wavde/blob/main/writing/judge-drift-mid-test.md).
+
 ## Out of scope
 
 Not in this package: a bandit framework, a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
