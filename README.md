@@ -158,6 +158,8 @@ The script uses a fixed seed and writes [`docs/silent_drift_results.md`](docs/si
 - A score monitor on the control arm can't see drift that only affects treatment. Score monitors on both arms also fire when true quality changes and the judge doesn't.
 - Agreement split by the human label separates judge drift from quality change, but needs thousands of labels per arm to detect a realistic drift.
 
+Write-up, with the decision rule: [When the judge drifts silently, random labels protect the readout and monitors only tell you where to look](https://github.com/wavde/wavde/blob/main/writing/silent-judge-drift.md).
+
 ## Out of scope
 
 Not in this package: a bandit framework, a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
