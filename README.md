@@ -24,6 +24,7 @@ Intended audience: analysts, data scientists, and experimentation platform engin
 | `cs_did` | Callaway & Sant'Anna (2021) staggered DiD, robust to heterogeneous cohort effects |
 | `sensitivity` | E-value (VanderWeele & Ding) and Rosenbaum bounds |
 | `llm_judge` | LLM-judge-scored A/B metrics: naive bias/power vs. PPI++ correction with a small human-labeled sample |
+| `offline_eval` | Offline LLM evals vs online A/B: mix shift, judge bias and online-only costs, with reweighting and PPI++ fixes |
 
 The public API is typed (the package ships a `py.typed` marker) and unit-tested, and the key methods cite their source in the module docstrings.
 
@@ -89,6 +90,23 @@ t, c = simulate_judged_experiment(5000, p_control=0.6, effect=0.0, judge_control
                                   judge_treatment=lenient, n_labeled_per_arm=500, seed=0)
 res = analyze_judged_experiment(t, c)  # {"naive", "human_only", "ppi"}
 ```
+
+## Offline evals vs online A/B
+
+When can an offline LLM eval win be trusted to predict the online result? `offline_eval` simulates an eval set whose prompt mix differs from live traffic, a judge whose errors can differ between the baseline and candidate outputs, and online-only costs such as latency. It compares the raw offline judge score, the score reweighted to the traffic mix, judge-plus-human-labels PPI++ reweighted to the mix, and the online A/B result. There are no model API calls.
+
+```bash
+python scripts/offline_online_sim.py
+```
+
+The script uses a fixed seed and writes [`docs/offline_online_results.md`](docs/offline_online_results.md) and [`docs/offline_online.png`](docs/offline_online.png).
+
+What the results show:
+
+- Reweighting to the traffic mix fixes mix shift.
+- Human labels fix judge bias.
+- No offline correction can see an online-only cost.
+- Each correction costs offline power, so an offline win is best used to choose what to test online, not to skip the online test.
 
 ## Out of scope
 

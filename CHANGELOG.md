@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `offline_eval`: offline LLM evals vs online A/B tests. Simulates segment
+  mix shift between the eval set and live traffic, judge error that differs
+  between baseline and candidate outputs, and online-only costs. It compares
+  the raw judge readout, a readout post-stratified to the traffic mix, and
+  PPI++ with human labels per segment against the online A/B result.
+  Closed-form expectations are included for every readout.
+- `scripts/offline_online_sim.py`: seeded, single-command simulation that
+  writes `docs/offline_online_results.md` and `docs/offline_online.png`.
+- `--smoke` mode for both evidence scripts. CI now runs both in smoke mode,
+  so a clean-install break in an evidence pipeline fails the build.
 - `llm_judge`: A/B tests whose primary metric is scored by an LLM judge.
   Simulates binary true quality and a judge with per-arm sensitivity /
   specificity, which allows differential error between arms. Provides the naive
