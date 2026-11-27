@@ -31,3 +31,4 @@ jobs:
           python scripts/llm_judge_sim.py --smoke
           python scripts/offline_online_sim.py --smoke
           python scripts/ppi_covariates_sim.py --smoke
+          python scripts/judge_drift_sim.py --smoke
