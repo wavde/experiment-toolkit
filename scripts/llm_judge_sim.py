@@ -6,11 +6,14 @@ per-arm confusion matrix, so the ground truth is known by construction. Each
 simulated number is printed next to its closed-form value from
 experiment_toolkit.llm_judge.
 
-Run:  python scripts/llm_judge_sim.py
+Run:       python scripts/llm_judge_sim.py
+CI smoke:  python scripts/llm_judge_sim.py --smoke   (few reps, writes to a temp dir)
 """
 
 from __future__ import annotations
 
+import argparse
+import tempfile
 from pathlib import Path
 
 import matplotlib
@@ -255,6 +258,15 @@ def make_figure(sim_type1, sim_power):
 
 
 def main() -> None:
+    global N_REPS, SWEEP_REPS, OUT_MD, OUT_PNG
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--smoke", action="store_true",
+                        help="few replications, outputs to a temp dir (for CI)")
+    if parser.parse_args().smoke:
+        N_REPS, SWEEP_REPS = 20, 10
+        tmp = Path(tempfile.mkdtemp())
+        OUT_MD, OUT_PNG = tmp / OUT_MD.name, tmp / OUT_PNG.name
+
     seeds = np.random.SeedSequence(SEED).spawn(3)
     scenario_lines = table_scenarios(np.random.default_rng(seeds[0]))
     inflation_lines, n_human_full = table_inflation()
