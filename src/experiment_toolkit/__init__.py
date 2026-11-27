@@ -6,6 +6,21 @@ from experiment_toolkit.cs_did import (
     simulate_staggered_panel,
 )
 from experiment_toolkit.cuped import apply_cuped, compute_theta
+from experiment_toolkit.llm_judge import (
+    JudgeConfusion,
+    JudgeDiffResult,
+    JudgedArm,
+    analyze_judged_experiment,
+    expected_naive_diff,
+    judge_sample_size_inflation,
+    naive_judge_diff,
+    naive_judge_se,
+    ppi_expected_se,
+    ppi_mean_diff,
+    simulate_judged_arm,
+    simulate_judged_experiment,
+    two_sided_rejection_rate,
+)
 from experiment_toolkit.ratio import ratio_metric_variance
 from experiment_toolkit.sample_size import (
     cuped_sample_size_summary,
@@ -25,17 +40,30 @@ __version__ = "0.3.0"
 __all__ = [
     "CSResult",
     "EValueResult",
+    "JudgeConfusion",
+    "JudgeDiffResult",
+    "JudgedArm",
+    "analyze_judged_experiment",
     "apply_cuped",
     "compute_theta",
     "cs_staggered_att",
     "cuped_sample_size_summary",
     "e_value",
+    "expected_naive_diff",
+    "judge_sample_size_inflation",
     "mde_for_n",
     "msprt_cuped_pvalue",
     "msprt_pvalue",
+    "naive_judge_diff",
+    "naive_judge_se",
+    "ppi_expected_se",
+    "ppi_mean_diff",
     "ratio_metric_variance",
     "rosenbaum_gamma_threshold",
     "rosenbaum_wilcoxon_bounds",
     "sample_size_for_mde",
+    "simulate_judged_arm",
+    "simulate_judged_experiment",
     "simulate_staggered_panel",
+    "two_sided_rejection_rate",
 ]
