@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `judge_drift`: silent judge drift with no version flag. `SilentDrift` changes
+  the judge from an unknown day (step or linear ramp, per arm) or shifts true
+  quality with the judge unchanged. `analyze_silent` compares the judge-only
+  readout with PPI++ using launch-week or whole-test random labels, and
+  `first_alarm` is a windowed, Bonferroni-corrected drift monitor for judge
+  scores or for judge-human agreement split by the human label. Closed forms
+  are included for the judge-only mean, the large-sample bias of launch-week
+  labels, and the chance that one monitor check flags.
+- `scripts/silent_drift_sim.py`: seeded, single-command simulation that writes
+  `docs/silent_drift_results.md` and `docs/silent_drift.png`. CI smoke-runs it.
 - `judge_drift`: a judge model upgraded mid-test. Simulates a switch to a new
   judge (with per-arm error rates) partway through an A/B test, and compares
   the pooled judge score, the pre-upgrade judge score, and PPI++ with labels
