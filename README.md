@@ -78,6 +78,8 @@ python scripts/llm_judge_sim.py
 
 The script uses a fixed seed and writes [`docs/llm_judge_results.md`](docs/llm_judge_results.md) and [`docs/llm_judge.png`](docs/llm_judge.png). Every simulated number appears next to its closed-form value. When judge noise is the same in both arms, it shrinks the effect by Youden's J and costs power. When the noise differs between arms, the naive test's false-positive rate grows with sample size. Calibration labels have to be drawn within each arm: a single shared or offline calibration cancels out of the difference.
 
+Write-up, with the decision rule: [LLM-as-judge is a noisy metric: what it does to A/B power and bias](https://github.com/wavde/wavde/blob/main/writing/llm-judge-noise-in-ab-tests.md).
+
 ```python
 from experiment_toolkit import JudgeConfusion, simulate_judged_experiment, analyze_judged_experiment
 
