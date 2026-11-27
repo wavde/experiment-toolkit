@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `judge_drift`: a judge model upgraded mid-test. Simulates a switch to a new
+  judge (with per-arm error rates) partway through an A/B test, and compares
+  the pooled judge score, the pre-upgrade judge score, and PPI++ with labels
+  spread across the test, labels only before the upgrade, or labels
+  stratified by judge version. Closed forms are included for the naive means
+  and SEs and for the large-sample bias of front-loaded labels.
+- `scripts/judge_drift_sim.py`: seeded, single-command simulation that writes
+  `docs/judge_drift_results.md` and `docs/judge_drift.png`. CI smoke-runs it.
 - `ppi_covariates`: PPI++ with several control variates, combining the LLM
   judge score with a pre-treatment covariate in the CUPED style. Includes
   closed-form oracle variance `Var(Y)/n · (1 − R² · N/(N+n))`, label budgets

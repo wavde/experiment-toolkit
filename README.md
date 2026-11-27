@@ -26,6 +26,7 @@ Intended audience: analysts, data scientists, and experimentation platform engin
 | `llm_judge` | LLM-judge-scored A/B metrics: naive bias/power vs. PPI++ correction with a small human-labeled sample |
 | `offline_eval` | Offline LLM evals vs online A/B: mix shift, judge bias and online-only costs, with reweighting and PPI++ fixes |
 | `ppi_covariates` | PPI++ plus a pre-treatment covariate (CUPED-style): closed-form label budgets and when the covariate stops helping |
+| `judge_drift` | A judge model upgraded mid-test: which analyses stay valid, and why front-loaded human labels don't |
 
 The public API is typed (the package ships a `py.typed` marker) and unit-tested, and the key methods cite their source in the module docstrings.
 
@@ -124,6 +125,21 @@ The script uses a fixed seed and writes [`docs/ppi_covariates_results.md`](docs/
 The covariate's gain depends on how much it adds beyond the judge. It is largest when the judge is weak, small when the judge is strong, and capped when labels are a large share of each arm.
 
 Write-up, with the decision rule: [A covariate stacks on the judge, but a better judge beats both](https://github.com/wavde/wavde/blob/main/writing/ppi-with-covariates-label-budget.md).
+
+## Judge drift mid-test
+
+What happens to a judge-scored A/B test when the judge model is upgraded partway through? `judge_drift` simulates an upgrade that switches both arms to a new judge at the same time, and compares five analyses: the judge score pooled over the test, the judge score before the upgrade only, and three PPI++ variants that differ in when human labels are drawn.
+
+```bash
+python scripts/judge_drift_sim.py
+```
+
+The script uses a fixed seed and writes [`docs/judge_drift_results.md`](docs/judge_drift_results.md) and [`docs/judge_drift.png`](docs/judge_drift.png).
+
+- An upgrade that changes both arms' judged rates equally is harmless under the null.
+- An upgrade that is more lenient on one arm's outputs biases the pooled judge score.
+- It also biases PPI++ if all the human labels were collected before the upgrade.
+- PPI++ with labels spread across the test, or stratified by judge version, stays unbiased.
 
 ## Out of scope
 
