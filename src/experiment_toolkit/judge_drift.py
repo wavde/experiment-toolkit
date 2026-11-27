@@ -33,6 +33,19 @@ Analyses compared
 whatever the judges do, because labels are a random sample within each
 (arm, period) cell that is weighted correctly. ``ppi_front`` is unbiased only
 when the upgrade shifts both arms' judged rates by the same amount.
+
+Silent drift (no version boundary)
+----------------------------------
+A hosted judge can change under the same model name, so the analysis has no
+version flag to stratify on. :class:`SilentDrift` moves each arm's judge from a
+base confusion matrix to a drifted one, starting on an unknown day and either
+as a step or a linear ramp. It can also shift true quality in both arms with
+no judge change, which is the case a monitor should *not* call judge drift.
+:func:`analyze_silent` compares the judge-only difference with PPI++ using
+launch-week labels or labels drawn at random from the whole test.
+:func:`first_alarm` is a cheap monitor: each day it compares the latest
+``window`` days of a series with a reference period at the start, and the
+Bonferroni threshold keeps the chance of any false alarm at or below ``alpha``.
 """
 
 from __future__ import annotations
@@ -225,3 +238,219 @@ def expected_ppi_front(upgrade: JudgeUpgrade, p_control: float, effect: float,
 def rejection_rate(mean: float, se: float) -> float:
     shift = mean / se
     return float(stats.norm.cdf(shift - _Z) + stats.norm.cdf(-shift - _Z))
+
+
+# -- silent drift: no version boundary ---------------------------------------------
+
+
+def _lerp(a: JudgeConfusion, b: JudgeConfusion, w: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    return (a.sensitivity + w * (b.sensitivity - a.sensitivity),
+            a.specificity + w * (b.specificity - a.specificity))
+
+
+@dataclass(frozen=True)
+class SilentDrift:
+    """Judge drift the analysis is not told about.
+
+    Before ``start_day`` (1-based) both arms are scored by ``base``. From
+    ``start_day`` each arm's sensitivity and specificity move linearly towards
+    ``after_t`` / ``after_c`` and arrive after ``ramp_days`` days (1 = a step
+    change). ``quality_shift`` moves both arms' true rates by the same amount
+    on the same schedule, with no change in the judge.
+    """
+
+    base: JudgeConfusion
+    after_t: JudgeConfusion
+    after_c: JudgeConfusion
+    start_day: int
+    ramp_days: int = 1
+    quality_shift: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.start_day < 1 or self.ramp_days < 1:
+            raise ValueError("start_day and ramp_days must be at least 1")
+
+    def weight(self, day: np.ndarray) -> np.ndarray:
+        """Share of the way from base to drifted on each day (0 before the start)."""
+        return np.clip((np.asarray(day) - self.start_day + 1) / self.ramp_days, 0.0, 1.0)
+
+    def path(self, arm: str, p: float, days: np.ndarray
+             ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """True rate, sensitivity and specificity on each of ``days`` for one arm."""
+        after = {"t": self.after_t, "c": self.after_c}[arm]
+        w = self.weight(days)
+        sens, spec = _lerp(self.base, after, w)
+        return p + self.quality_shift * w, sens, spec
+
+
+@dataclass(frozen=True)
+class DailyArm:
+    y: np.ndarray
+    s: np.ndarray
+    day: np.ndarray  # 1-based day each unit arrived
+
+
+def simulate_silent_experiment(
+    n_days: int, n_per_day: int, p_control: float, effect: float, drift: SilentDrift,
+    rng: np.random.Generator,
+) -> tuple[DailyArm, DailyArm]:
+    """Equal daily traffic in each arm; returns ``(treatment, control)``."""
+    if n_days < 2 or n_per_day < 1:
+        raise ValueError("need at least 2 days and 1 unit per day")
+    days = np.arange(1, n_days + 1)
+    for name, p in (("c", p_control), ("t", p_control + effect)):
+        rates = drift.path(name, p, days)[0]
+        if rates.min() < 0.0 or rates.max() > 1.0:
+            raise ValueError("true rate leaves [0, 1]")
+
+    def arm(name: str, p: float) -> DailyArm:
+        p_d, sens_d, spec_d = drift.path(name, p, days)
+        day = np.repeat(days, n_per_day)
+        i = day - 1
+        y = (rng.random(len(day)) < p_d[i]).astype(float)
+        hit = np.where(y == 1.0, sens_d[i], 1.0 - spec_d[i])
+        s = (rng.random(len(day)) < hit).astype(float)
+        return DailyArm(y, s, day)
+
+    return arm("t", p_control + effect), arm("c", p_control)
+
+
+def label_mask(arm: DailyArm, k: int, rng: np.random.Generator,
+               last_day: int | None = None) -> np.ndarray:
+    """A simple random sample of ``k`` units, from days up to ``last_day`` if given."""
+    pool = np.flatnonzero(arm.day <= (last_day if last_day is not None else arm.day.max()))
+    if k > len(pool):
+        raise ValueError("more labels than units in the labeling window")
+    mask = np.zeros(len(arm.y), dtype=bool)
+    mask[rng.choice(pool, size=k, replace=False)] = True
+    return mask
+
+
+SILENT_ANALYSES = ("naive_pooled", "ppi_launch", "ppi_spread")
+
+
+def analyze_silent(
+    t: DailyArm, c: DailyArm, spread_t: np.ndarray, spread_c: np.ndarray,
+    launch_t: np.ndarray, launch_c: np.ndarray,
+) -> dict[str, Readout]:
+    """Judge-only difference, and PPI++ with launch-window or spread-out labels."""
+    def ppi(lab_t: np.ndarray, lab_c: np.ndarray) -> Readout:
+        r = ppi_mean_diff(t.y[lab_t], t.s[lab_t], t.s[~lab_t],
+                          c.y[lab_c], c.s[lab_c], c.s[~lab_c])
+        return Readout(r.estimate, r.se)
+
+    return {
+        "naive_pooled": _naive(t.s, c.s),
+        "ppi_launch": ppi(launch_t, launch_c),
+        "ppi_spread": ppi(spread_t, spread_c),
+    }
+
+
+def first_alarm(
+    series: list[tuple[np.ndarray, np.ndarray]], n_days: int, ref_days: int = 7,
+    window: int = 7, alpha: float = 0.05,
+) -> int | None:
+    """First day any series' recent mean differs from its reference-period mean.
+
+    Each series is ``(values, day)``. On every day ``d`` from
+    ``ref_days + window`` to ``n_days``, days ``d - window + 1 .. d`` are
+    compared with days ``1 .. ref_days`` by a two-sample z-test with unpooled
+    variances. The critical value is Bonferroni-corrected over every check of
+    every series, so with no change the chance of any alarm is at most
+    ``alpha``. Returns the alarm day, or ``None``.
+    """
+    checks = np.arange(ref_days + window, n_days + 1)
+    if len(checks) == 0:
+        raise ValueError("n_days too short for the reference period and window")
+    z_crit = float(stats.norm.ppf(1 - alpha / (2 * len(checks) * len(series))))
+    first = None
+    for values, day in series:
+        x = np.asarray(values, dtype=float)
+        n_d = np.bincount(day, minlength=n_days + 1)[1:].astype(float)
+        s1 = np.bincount(day, weights=x, minlength=n_days + 1)[1:]
+        s2 = np.bincount(day, weights=x * x, minlength=n_days + 1)[1:]
+        cn, c1, c2 = (np.concatenate([[0.0], np.cumsum(a)]) for a in (n_d, s1, s2))
+
+        def stats_for(lo: np.ndarray, hi: np.ndarray, cn=cn, c1=c1, c2=c2):
+            n = cn[hi] - cn[lo]
+            with np.errstate(invalid="ignore", divide="ignore"):
+                m = (c1[hi] - c1[lo]) / n
+                v = ((c2[hi] - c2[lo]) - n * m**2) / (n - 1)
+            return n, m, v
+
+        n_r, m_r, v_r = stats_for(np.zeros(1, dtype=int), np.full(1, ref_days))
+        n_w, m_w, v_w = stats_for(checks - window, checks)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            z = (m_w - m_r) / np.sqrt(v_r / n_r + v_w / n_w)
+        hits = checks[np.nan_to_num(np.abs(z), nan=0.0, posinf=0.0) > z_crit]
+        if len(hits) and (first is None or hits[0] < first):
+            first = int(hits[0])
+    return first
+
+
+def score_series(arm: DailyArm) -> tuple[np.ndarray, np.ndarray]:
+    """Every judge score in the arm, for a score monitor."""
+    return arm.s, arm.day
+
+
+def agreement_series(arm: DailyArm, labeled: np.ndarray
+                     ) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Judge pass rate among human-pass and among human-fail labeled units.
+
+    These are the judge's sensitivity and false-positive rate. Unlike the raw
+    agreement rate or the judge-minus-human gap, they don't move when true
+    quality shifts and the judge stays the same.
+    """
+    out = []
+    for good in (1.0, 0.0):
+        keep = labeled & (arm.y == good)
+        out.append((arm.s[keep], arm.day[keep]))
+    return out
+
+
+def expected_silent_naive(drift: SilentDrift, p_control: float, effect: float,
+                          n_days: int) -> float:
+    """Expected judge-only difference with equal traffic every day."""
+    days = np.arange(1, n_days + 1)
+
+    def mean_q(arm: str, p: float) -> float:
+        p_d, sens, spec = drift.path(arm, p, days)
+        return float(np.mean(sens * p_d + (1 - spec) * (1 - p_d)))
+
+    return mean_q("t", p_control + effect) - mean_q("c", p_control)
+
+
+def expected_ppi_launch(drift: SilentDrift, p_control: float, effect: float, n_days: int,
+                        n_per_day: int, n_labeled: int, launch_days: int) -> float:
+    """Large-sample mean of PPI++ when every label comes from the first
+    ``launch_days`` days (population version of the PPI++ weight)."""
+    days = np.arange(1, n_days + 1)
+    n = n_days * n_per_day
+    n_unlab = n - n_labeled
+
+    def arm(name: str, p: float) -> float:
+        p_d, sens, spec = drift.path(name, p, days)
+        q_d = sens * p_d + (1 - spec) * (1 - p_d)
+        early = days <= launch_days
+        p_l, q_l = p_d[early].mean(), q_d[early].mean()
+        cov_ys = (p_d * sens)[early].mean() - p_l * q_l
+        m = q_d.mean()
+        lam = cov_ys / ((1 + n_labeled / n_unlab) * m * (1 - m))
+        unlab_mean = (n * m - n_labeled * q_l) / n_unlab
+        return float(p_l - lam * (q_l - unlab_mean))
+
+    return arm("t", p_control + effect) - arm("c", p_control)
+
+
+def window_detection_prob(mean_ref: float, var_ref: float, n_ref: float, mean_win: float,
+                          var_win: float, n_win: float, z_crit: float) -> float:
+    """Probability one check flags, for a window wholly after the change."""
+    shift = (mean_win - mean_ref) / np.sqrt(var_ref / n_ref + var_win / n_win)
+    return float(stats.norm.cdf(shift - z_crit) + stats.norm.cdf(-shift - z_crit))
+
+
+def monitor_z_crit(n_days: int, n_series: int, ref_days: int = 7, window: int = 7,
+                   alpha: float = 0.05) -> float:
+    """The Bonferroni critical value :func:`first_alarm` uses."""
+    n_checks = n_days - ref_days - window + 1
+    return float(stats.norm.ppf(1 - alpha / (2 * n_checks * n_series)))

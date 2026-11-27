@@ -26,7 +26,7 @@ Intended audience: analysts, data scientists, and experimentation platform engin
 | `llm_judge` | LLM-judge-scored A/B metrics: naive bias/power vs. PPI++ correction with a small human-labeled sample |
 | `offline_eval` | Offline LLM evals vs online A/B: mix shift, judge bias and online-only costs, with reweighting and PPI++ fixes |
 | `ppi_covariates` | PPI++ plus a pre-treatment covariate (CUPED-style): closed-form label budgets and when the covariate stops helping |
-| `judge_drift` | A judge model upgraded mid-test: which analyses stay valid, and why front-loaded human labels don't |
+| `judge_drift` | A judge that changes mid-test, flagged or silent: which analyses stay valid, why front-loaded human labels don't, and what cheap drift monitors can and can't detect |
 
 The public API is typed (the package ships a `py.typed` marker) and unit-tested, and the key methods cite their source in the module docstrings.
 
@@ -142,6 +142,21 @@ The script uses a fixed seed and writes [`docs/judge_drift_results.md`](docs/jud
 - PPI++ with labels spread across the test, or stratified by judge version, stays unbiased.
 
 Write-up, with the decision rule: [Upgrading the judge mid-test is safe only if your labels know about it](https://github.com/wavde/wavde/blob/main/writing/judge-drift-mid-test.md).
+
+## Silent judge drift
+
+A hosted judge can change under the same model name, so the analysis has no version flag to stratify on. `SilentDrift` changes the judge from an unknown day, as a step or a gradual ramp, on one or both arms. It can also shift true quality with no judge change, which a drift monitor should not flag. The simulation compares the judge-only readout with PPI++ using launch-week labels or labels drawn at random from the whole test. It also runs three cheap monitors (`first_alarm`): judge pass rate on the control arm, judge pass rate on each arm, and the judge's agreement with human labels split by the human label.
+
+```bash
+python scripts/silent_drift_sim.py
+```
+
+The script uses a fixed seed and writes [`docs/silent_drift_results.md`](docs/silent_drift_results.md) and [`docs/silent_drift.png`](docs/silent_drift.png).
+
+- PPI++ with labels drawn at random from the whole test stays valid under every drift tested, without knowing when or whether the judge changed. The labels can be drawn at the end from logged outputs.
+- Launch-week labels and the judge-only readout are biased when drift hits one arm more than the other.
+- A score monitor on the control arm can't see drift that only affects treatment. Score monitors on both arms also fire when true quality changes and the judge doesn't.
+- Agreement split by the human label separates judge drift from quality change, but needs thousands of labels per arm to detect a realistic drift.
 
 ## Out of scope
 
