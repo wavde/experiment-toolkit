@@ -108,6 +108,8 @@ What the results show:
 - No offline correction can see an online-only cost.
 - Each correction costs offline power, so an offline win is best used to choose what to test online, not to skip the online test.
 
+Write-up, with the decision rule: [An offline eval win is evidence about the eval set](https://github.com/wavde/wavde/blob/main/writing/offline-evals-vs-online-ab.md).
+
 ## Out of scope
 
 Not in this package: a bandit framework, a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
