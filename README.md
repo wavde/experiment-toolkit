@@ -25,6 +25,7 @@ Intended audience: analysts, data scientists, and experimentation platform engin
 | `sensitivity` | E-value (VanderWeele & Ding) and Rosenbaum bounds |
 | `llm_judge` | LLM-judge-scored A/B metrics: naive bias/power vs. PPI++ correction with a small human-labeled sample |
 | `offline_eval` | Offline LLM evals vs online A/B: mix shift, judge bias and online-only costs, with reweighting and PPI++ fixes |
+| `ppi_covariates` | PPI++ plus a pre-treatment covariate (CUPED-style): closed-form label budgets and when the covariate stops helping |
 
 The public API is typed (the package ships a `py.typed` marker) and unit-tested, and the key methods cite their source in the module docstrings.
 
@@ -109,6 +110,18 @@ What the results show:
 - Each correction costs offline power, so an offline win is best used to choose what to test online, not to skip the online test.
 
 Write-up, with the decision rule: [An offline eval win is evidence about the eval set](https://github.com/wavde/wavde/blob/main/writing/offline-evals-vs-online-ab.md).
+
+## PPI++ with a pre-treatment covariate
+
+How much does a pre-treatment covariate, such as a query difficulty bucket or a user's prior-period outcome, cut the human-label budget of PPI++? `ppi_covariates` generalises PPI++ to several control variates (the judge score and the covariate). It provides the closed-form variance `Var(Y)/n · (1 − R² · N/(N+n))`, label budgets for a target power, and a simulator to check them.
+
+```bash
+python scripts/ppi_covariates_sim.py
+```
+
+The script uses a fixed seed and writes [`docs/ppi_covariates_results.md`](docs/ppi_covariates_results.md) and [`docs/ppi_covariates.png`](docs/ppi_covariates.png).
+
+The covariate's gain depends on how much it adds beyond the judge. It is largest when the judge is weak, small when the judge is strong, and capped when labels are a large share of each arm.
 
 ## Out of scope
 

@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `ppi_covariates`: PPI++ with several control variates, combining the LLM
+  judge score with a pre-treatment covariate in the CUPED style. Includes
+  closed-form oracle variance `Var(Y)/n · (1 − R² · N/(N+n))`, label budgets
+  for a target power (`labels_for_power`), and a simulator. With an
+  uninformative covariate it reproduces `llm_judge`'s PPI++ exactly.
+- `scripts/ppi_covariates_sim.py`: seeded, single-command simulation that
+  writes `docs/ppi_covariates_results.md` and `docs/ppi_covariates.png`.
+  CI smoke-runs it.
 - `offline_eval`: offline LLM evals vs online A/B tests. Simulates segment
   mix shift between the eval set and live traffic, judge error that differs
   between baseline and candidate outputs, and online-only costs. It compares
