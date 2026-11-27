@@ -194,6 +194,8 @@ res.estimate, res.ci()
 
 Where this breaks: with two to five variants the same-log overstatement is under 2 pp, so the extra machinery buys little. A thin propensity floor (≤1% of variant traffic) drops the slice's coverage to 0.91–0.93. Lifts are held constant over time; if generated creatives have a novelty effect that fades, no estimate from the test window measures the post-launch lift, and only a later confirmation test does.
 
+Write-up: [Classic case studies, reread in 2026](https://github.com/wavde/wavde/blob/main/writing/classic-case-studies-reread-2026.md).
+
 ## Out of scope
 
 Not in this package: a bandit framework (`bandit_eval` only evaluates logged bandit traffic; its simulator is a minimal test fixture), a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
