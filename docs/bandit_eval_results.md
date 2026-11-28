@@ -9,6 +9,8 @@ pip install -e ".[dev]"
 python scripts/bandit_eval_sim.py
 ```
 
+The full run takes about 33 minutes on a laptop CPU (`--smoke` takes seconds).
+
 ## Setup
 
 Seed `20261127`. No model API calls. The incumbent creative (control) has click rate 5%. A test runs 480,000 impressions in 12 batches of 40,000. The control keeps a fixed 20% of traffic. Batched Thompson sampling with a Beta(10, 190) prior (centred on the incumbent's rate) allocates the rest across the generated variants, with 20% of variant traffic spread uniformly as a floor. The allocation probabilities are logged and are the exact assignment probabilities. With drift, every arm's click rate is multiplied by a factor that rises linearly from 0.8 to 1.2 over the test (it averages 1); the bandit assumes rates are constant. Variant lifts are relative and constant over time.
