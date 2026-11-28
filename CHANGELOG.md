@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `judge_drift`: canary-set drift monitor. `simulate_canary` re-judges a fixed
+  set of stored outputs daily under a `SilentDrift`, with a `repeatability`
+  setting for how often the judge repeats its verdict. `canary_alarm` is a
+  paired, Bonferroni-corrected monitor on those verdicts, and
+  `canary_detection_prob` / `canary_items_for_power` give closed-form
+  detection probability and canary size.
+- `scripts/canary_drift_sim.py`: seeded, single-command simulation that writes
+  `docs/canary_drift_results.md` and `docs/canary_drift.png`. CI smoke-runs it.
 - `judge_drift`: silent judge drift with no version flag. `SilentDrift` changes
   the judge from an unknown day (step or linear ramp, per arm) or shifts true
   quality with the judge unchanged. `analyze_silent` compares the judge-only
