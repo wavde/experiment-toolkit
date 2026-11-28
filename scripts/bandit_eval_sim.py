@@ -4,7 +4,7 @@ Writes docs/bandit_eval_results.md and docs/bandit_eval.png. There are no model
 API calls. Creative variants, a batched Thompson-sampling allocator and clicks
 are simulated, so every true lift is known. Uses experiment_toolkit.bandit_eval.
 
-Run:       python scripts/bandit_eval_sim.py
+Run:       python scripts/bandit_eval_sim.py   (about 33 minutes on a laptop CPU)
 CI smoke:  python scripts/bandit_eval_sim.py --smoke   (few reps, writes to a temp dir)
 """
 
@@ -299,6 +299,8 @@ def main() -> None:
         'pip install -e ".[dev]"',
         "python scripts/bandit_eval_sim.py",
         "```",
+        "",
+        "The full run takes about 33 minutes on a laptop CPU (`--smoke` takes seconds).",
         "",
         "## Setup",
         "",

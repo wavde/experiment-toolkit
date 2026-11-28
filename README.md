@@ -185,7 +185,7 @@ Generative tools make it cheap to test 20 or 50 creative variants at once, and a
 python scripts/bandit_eval_sim.py
 ```
 
-The script uses a fixed seed and writes [`docs/bandit_eval_results.md`](docs/bandit_eval_results.md) and [`docs/bandit_eval.png`](docs/bandit_eval.png). It takes about 30 minutes.
+The script uses a fixed seed and writes [`docs/bandit_eval_results.md`](docs/bandit_eval_results.md) and [`docs/bandit_eval.png`](docs/bandit_eval.png). The full run takes about 33 minutes on a laptop CPU; `--smoke` takes seconds.
 
 Two biases are at work, and they need different fixes:
 
