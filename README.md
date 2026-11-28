@@ -211,7 +211,7 @@ res.estimate, res.ci()
 
 Where this breaks: with two to five variants the same-log overstatement is under 2 pp, so the extra machinery buys little. A thin propensity floor (≤1% of variant traffic) drops the slice's coverage to 0.91–0.93. Lifts are held constant over time; if generated creatives have a novelty effect that fades, no estimate from the test window measures the post-launch lift, and only a later confirmation test does.
 
-Write-up: [Classic case studies, reread in 2026](https://github.com/wavde/wavde/blob/main/writing/classic-case-studies-reread-2026.md).
+Write-up, with the decision rule: [Five classic data science case studies, re-read in 2026](https://github.com/wavde/wavde/blob/main/writing/classic-case-studies-reread-2026.md).
 
 ## Real-data judge audit (MT-Bench)
 
