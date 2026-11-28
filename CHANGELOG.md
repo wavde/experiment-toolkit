@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `judge_audit`: real-data audit of an LLM judge against expert human
+  judgments on MT-Bench (Zheng et al., 2023, CC BY 4.0), downloaded at runtime
+  from a pinned revision and checked against SHA-256 hashes. Lines up human
+  and GPT-4 verdicts item by item, estimates the judge's win-rate bias with a
+  question-level bootstrap, splits agreement by which model humans preferred,
+  and runs a known-answer resampling check of judge-only, human-only and
+  PPI++ readouts. New `data` extra (`pyarrow`) for reading the parquet files.
+- `scripts/judge_audit_mtbench.py`: seeded, single-command audit that writes
+  `docs/judge_audit_results.md` and `docs/judge_audit.png`. CI smoke-runs it
+  on synthetic data with the real schema.
 - `judge_drift`: canary-set drift monitor. `simulate_canary` re-judges a fixed
   set of stored outputs daily under a `SilentDrift`, with a `repeatability`
   setting for how often the judge repeats its verdict. `canary_alarm` is a

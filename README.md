@@ -28,6 +28,7 @@ Intended audience: analysts, data scientists, and experimentation platform engin
 | `ppi_covariates` | PPI++ plus a pre-treatment covariate (CUPED-style): closed-form label budgets and when the covariate stops helping |
 | `judge_drift` | A judge that changes mid-test, flagged or silent: which analyses stay valid, why front-loaded human labels don't, and which drift monitors (judge scores, label agreement, a re-judged canary set) can detect it |
 | `bandit_eval` | Lift of a creative a bandit picked from many generated variants: winner's curse, time confounding, and off-policy (IPS / SNIPS / DR) estimates from logged propensities |
+| `judge_audit` | Real-data audit of an LLM judge against expert humans (MT-Bench): win-rate bias, error that depends on which model humans preferred, and PPI++ checked against a known answer |
 
 The public API is typed (the package ships a `py.typed` marker) and unit-tested, and the key methods cite their source in the module docstrings.
 
@@ -211,6 +212,22 @@ res.estimate, res.ci()
 Where this breaks: with two to five variants the same-log overstatement is under 2 pp, so the extra machinery buys little. A thin propensity floor (≤1% of variant traffic) drops the slice's coverage to 0.91–0.93. Lifts are held constant over time; if generated creatives have a novelty effect that fades, no estimate from the test window measures the post-launch lift, and only a later confirmation test does.
 
 Write-up: [Classic case studies, reread in 2026](https://github.com/wavde/wavde/blob/main/writing/classic-case-studies-reread-2026.md).
+
+## Real-data judge audit (MT-Bench)
+
+Every LLM-judge simulation above assumes a judge whose errors can depend on which arm produced the output. `judge_audit` checks that on real data: the public [MT-Bench human judgments](https://huggingface.co/datasets/lmsys/mt_bench_human_judgments) (Zheng et al., 2023, CC BY 4.0), where expert humans and GPT-4 judged the same pairwise comparisons of six models. Each pair of models is read as a side-by-side test, with the stronger model as treatment.
+
+```bash
+pip install -e ".[dev,data]"
+python scripts/judge_audit_mtbench.py
+```
+
+The data (about 1.4 MB) are downloaded on first run from a pinned revision, checked against SHA-256 hashes and cached in `data/mt_bench/`; they aren't committed. The script uses a fixed seed and writes [`docs/judge_audit_results.md`](docs/judge_audit_results.md) and [`docs/judge_audit.png`](docs/judge_audit.png). CI smoke-runs it on synthetic data with the same schema.
+
+- GPT-4's win rate for the stronger model was above the experts' in all 15 pairs, by up to +0.185, on the same items.
+- When experts preferred the stronger model, GPT-4 agreed 82% of the time; when they preferred the weaker one, 22%. The judge's error depends on the arm.
+- In a known-answer check that resamples the real verdicts, with 200 human labels per pair, PPI++ kept 93–96% coverage. The judge alone covered the truth in at most 0.5% of replications in 13 of 15 pairs, and at most 44% in the other two.
+- The real judge correlates with humans far less than the simulated judges assumed (0.14–0.56 against 0.69), so PPI++ saved only 2–28% of labels.
 
 ## Out of scope
 
