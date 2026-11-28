@@ -46,6 +46,17 @@ launch-week labels or labels drawn at random from the whole test.
 :func:`first_alarm` is a cheap monitor: each day it compares the latest
 ``window`` days of a series with a reference period at the start, and the
 Bonferroni threshold keeps the chance of any false alarm at or below ``alpha``.
+
+Canary set
+----------
+A canary set is a fixed set of stored outputs re-judged every day. Because the
+outputs never change, a shift in their judge scores can only come from the
+judge. :func:`simulate_canary` re-judges ``n_items`` stored outputs of one arm
+under a :class:`SilentDrift`. ``repeatability`` sets how often the judge gives
+an item the same verdict on different days, from 0 (fresh noise each day) to 1
+(deterministic), without changing the judge's error rates.
+:func:`canary_alarm` is a paired version of :func:`first_alarm`: it compares
+each item's recent verdicts with its own reference-period verdicts.
 """
 
 from __future__ import annotations
@@ -454,3 +465,109 @@ def monitor_z_crit(n_days: int, n_series: int, ref_days: int = 7, window: int = 
     """The Bonferroni critical value :func:`first_alarm` uses."""
     n_checks = n_days - ref_days - window + 1
     return float(stats.norm.ppf(1 - alpha / (2 * n_checks * n_series)))
+
+
+# -- canary set: fixed stored outputs re-judged daily --------------------------------
+
+
+def simulate_canary(
+    drift: SilentDrift, arm: str, n_items: int, p: float, n_days: int,
+    repeatability: float, rng: np.random.Generator,
+) -> np.ndarray:
+    """Judge verdicts, shape ``(n_items, n_days)``, on fixed stored outputs of one arm.
+
+    True quality is drawn once per item at rate ``p`` and never changes, so
+    ``drift.quality_shift`` has no effect here. Each verdict is
+    ``u < rate`` with ``u = Phi(sqrt(r) z_item + sqrt(1 - r) e_item_day)``, so
+    the judge's sensitivity and specificity hold on every day for any ``r``.
+    """
+    _check_p(p)
+    if not 0.0 <= repeatability <= 1.0:
+        raise ValueError("repeatability must be in [0, 1]")
+    if n_items < 2 or n_days < 2:
+        raise ValueError("need at least 2 items and 2 days")
+    days = np.arange(1, n_days + 1)
+    _, sens, spec = drift.path(arm, p, days)
+    y = rng.random(n_items) < p
+    rate = np.where(y[:, None], sens[None, :], 1.0 - spec[None, :])
+    latent = (np.sqrt(repeatability) * rng.standard_normal((n_items, 1))
+              + np.sqrt(1.0 - repeatability) * rng.standard_normal((n_items, n_days)))
+    return (stats.norm.cdf(latent) < rate).astype(float)
+
+
+def canary_z(verdicts: np.ndarray, ref_days: int = 7, window: int = 7
+             ) -> tuple[np.ndarray, np.ndarray]:
+    """Paired z-statistic on each check day for one canary set.
+
+    For check day ``d``, each item's mean verdict over days
+    ``d - window + 1 .. d`` minus its mean over days ``1 .. ref_days``; the
+    statistic is the mean of those differences over its standard error across
+    items. Returns ``(check_days, z)``; ``z`` is 0 where no item changed.
+    """
+    s = np.asarray(verdicts, dtype=float)
+    n_items, n_days = s.shape
+    checks = np.arange(ref_days + window, n_days + 1)
+    if len(checks) == 0:
+        raise ValueError("n_days too short for the reference period and window")
+    ref = s[:, :ref_days].mean(axis=1)
+    cs = np.concatenate([np.zeros((n_items, 1)), np.cumsum(s, axis=1)], axis=1)
+    d = (cs[:, checks] - cs[:, checks - window]) / window - ref[:, None]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        z = d.mean(axis=0) / (d.std(axis=0, ddof=1) / np.sqrt(n_items))
+    return checks, np.nan_to_num(z, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def canary_alarm(sets: list[np.ndarray], ref_days: int = 7, window: int = 7,
+                 alpha: float = 0.05) -> int | None:
+    """First check day on which any canary set's paired z exceeds the Bonferroni
+    threshold over every check and set (the same threshold as
+    :func:`first_alarm`). Returns ``None`` if no set ever flags."""
+    first = None
+    n_days = sets[0].shape[1]
+    z_crit = monitor_z_crit(n_days, len(sets), ref_days, window, alpha)
+    for s in sets:
+        checks, z = canary_z(s, ref_days, window)
+        hits = checks[np.abs(z) > z_crit]
+        if len(hits) and (first is None or hits[0] < first):
+            first = int(hits[0])
+    return first
+
+
+def _canary_item_moments(base: JudgeConfusion, after: JudgeConfusion, p: float,
+                         ref_days: int, window: int) -> tuple[float, float]:
+    """Mean and variance of one item's paired difference, fully changed window,
+    ``repeatability = 0``."""
+    out = []
+    for good, w in ((True, p), (False, 1.0 - p)):
+        r0 = base.sensitivity if good else 1 - base.specificity
+        r1 = after.sensitivity if good else 1 - after.specificity
+        out.append((w, r1 - r0, r0 * (1 - r0) / ref_days + r1 * (1 - r1) / window))
+    mean = sum(w * m for w, m, _ in out)
+    var = sum(w * v for w, _, v in out) + sum(w * (m - mean) ** 2 for w, m, _ in out)
+    return mean, var
+
+
+def canary_detection_prob(base: JudgeConfusion, after: JudgeConfusion, p: float,
+                          n_items: int, z_crit: float, ref_days: int = 7,
+                          window: int = 7) -> float:
+    """Chance one check flags a fully changed window (``repeatability = 0``)."""
+    mean, var = _canary_item_moments(base, after, p, ref_days, window)
+    shift = mean / np.sqrt(var / n_items)
+    return float(stats.norm.cdf(shift - z_crit) + stats.norm.cdf(-shift - z_crit))
+
+
+def canary_items_for_power(base: JudgeConfusion, after: JudgeConfusion, p: float,
+                           z_crit: float, power: float = 0.8, ref_days: int = 7,
+                           window: int = 7) -> int:
+    """Smallest canary set for which one check on a fully changed window flags
+    with probability ``power`` (``repeatability = 0``, one-sided approximation)."""
+    mean, var = _canary_item_moments(base, after, p, ref_days, window)
+    if mean == 0.0:
+        raise ValueError("the judge does not change on this arm")
+    k = int(np.ceil(var * ((z_crit + stats.norm.ppf(power)) / mean) ** 2))
+    while canary_detection_prob(base, after, p, k, z_crit, ref_days, window) < power:
+        k += 1
+    while k > 2 and canary_detection_prob(base, after, p, k - 1, z_crit, ref_days,
+                                          window) >= power:
+        k -= 1
+    return k

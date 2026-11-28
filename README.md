@@ -26,7 +26,7 @@ Intended audience: analysts, data scientists, and experimentation platform engin
 | `llm_judge` | LLM-judge-scored A/B metrics: naive bias/power vs. PPI++ correction with a small human-labeled sample |
 | `offline_eval` | Offline LLM evals vs online A/B: mix shift, judge bias and online-only costs, with reweighting and PPI++ fixes |
 | `ppi_covariates` | PPI++ plus a pre-treatment covariate (CUPED-style): closed-form label budgets and when the covariate stops helping |
-| `judge_drift` | A judge that changes mid-test, flagged or silent: which analyses stay valid, why front-loaded human labels don't, and what cheap drift monitors can and can't detect |
+| `judge_drift` | A judge that changes mid-test, flagged or silent: which analyses stay valid, why front-loaded human labels don't, and which drift monitors (judge scores, label agreement, a re-judged canary set) can detect it |
 | `bandit_eval` | Lift of a creative a bandit picked from many generated variants: winner's curse, time confounding, and off-policy (IPS / SNIPS / DR) estimates from logged propensities |
 
 The public API is typed (the package ships a `py.typed` marker) and unit-tested, and the key methods cite their source in the module docstrings.
@@ -161,6 +161,20 @@ The script uses a fixed seed and writes [`docs/silent_drift_results.md`](docs/si
 
 Write-up, with the decision rule: [When the judge drifts silently, random labels protect the readout and monitors only tell you where to look](https://github.com/wavde/wavde/blob/main/writing/silent-judge-drift.md).
 
+## Canary-set drift monitor
+
+A canary set is a fixed set of stored outputs that the production judge re-scores every day. Their true quality can't change, so a shift in their scores can only come from the judge. `simulate_canary` re-judges stored outputs under a `SilentDrift`, with a `repeatability` setting for how often the judge repeats its verdict on the same output. `canary_alarm` compares each output's recent verdicts with its own early ones. The simulation runs it on the same scenarios as the silent-drift simulation, next to the score and agreement monitors.
+
+```bash
+python scripts/canary_drift_sim.py
+```
+
+The script uses a fixed seed and writes [`docs/canary_drift_results.md`](docs/canary_drift_results.md) and [`docs/canary_drift.png`](docs/canary_drift.png).
+
+- With 400 stored outputs per arm and no human labels, the canary caught treatment-only drift about as often and as fast as a score monitor on both arms, and caught gradual drift more often.
+- Unlike the score monitors, it stayed quiet when true quality fell and the judge didn't change.
+- A canary built only from control outputs missed drift that affected only treatment outputs. The canary has to contain outputs from every arm.
+- Closed forms give the canary size for a target detection probability (`canary_items_for_power`).
 ## Generated creatives picked by a bandit
 
 Generative tools make it cheap to test 20 or 50 creative variants at once, and a bandit moves traffic toward whichever is ahead. How far is the leader's reported lift from its true lift, and which estimate from the logged decisions can be trusted? `bandit_eval` provides off-policy estimators that use the logged allocation probabilities (IPS, self-normalised IPS, doubly robust), the naive dashboard comparison, and a minimal batched Thompson-sampling log generator with known ground truth. It evaluates bandit logs; it is not a bandit framework.

@@ -10,6 +10,10 @@ from experiment_toolkit.judge_drift import (
     agreement_series,
     analyze_drift,
     analyze_silent,
+    canary_alarm,
+    canary_detection_prob,
+    canary_items_for_power,
+    canary_z,
     expected_naive,
     expected_naive_se,
     expected_ppi_front,
@@ -22,6 +26,7 @@ from experiment_toolkit.judge_drift import (
     score_series,
     simulate_drift_arm,
     simulate_drift_experiment,
+    simulate_canary,
     simulate_silent_experiment,
     window_detection_prob,
 )
@@ -212,3 +217,72 @@ def test_silent_validation():
         label_mask(t, 71, np.random.default_rng(0), last_day=7)
     with pytest.raises(ValueError):
         first_alarm([score_series(t)], 13)
+
+
+# -- canary set ----------------------------------------------------------------------
+
+
+def test_canary_ignores_quality_shift_and_keeps_error_rates():
+    a = simulate_canary(S_NONE, "t", 300, 0.6, 28, 0.5, np.random.default_rng(21))
+    b = simulate_canary(S_QUALITY, "t", 300, 0.6, 28, 0.5, np.random.default_rng(21))
+    assert np.array_equal(a, b)
+    rng = np.random.default_rng(22)
+    s = np.vstack([simulate_canary(S_T_STEP, "t", 2_000, 0.0, 28, 0.9, rng) for _ in range(5)])
+    assert s[:, :14].mean() == pytest.approx(0.15, abs=0.01)
+    assert s[:, 14:].mean() == pytest.approx(0.25, abs=0.01)
+    c = simulate_canary(S_T_STEP, "c", 10_000, 0.0, 28, 0.9, rng)
+    assert c[:, 14:].mean() == pytest.approx(0.15, abs=0.01)
+
+
+def test_canary_repeatability():
+    rng = np.random.default_rng(23)
+    det = simulate_canary(S_NONE, "t", 500, 0.6, 28, 1.0, rng)
+    assert (det == det[:, :1]).all()
+    assert canary_alarm([det]) is None
+
+    def day_corr(r):
+        s = simulate_canary(S_NONE, "t", 20_000, 0.0, 2, r, rng)
+        return np.corrcoef(s[:, 0], s[:, 1])[0, 1]
+
+    assert abs(day_corr(0.0)) < 0.03
+    assert day_corr(0.9) > day_corr(0.5) > 0.2
+
+
+def test_canary_closed_form_matches_one_check():
+    rng = np.random.default_rng(24)
+    z_crit = monitor_z_crit(28, 2)
+    hits = [abs(canary_z(simulate_canary(S_T_STEP, "t", 300, 0.6, 28, 0.0, rng))[1][-1])
+            > z_crit for _ in range(600)]
+    assert np.mean(hits) == pytest.approx(
+        canary_detection_prob(OLD, LENIENT, 0.6, 300, z_crit), abs=0.05)
+
+
+def test_canary_items_for_power_is_minimal():
+    z_crit = monitor_z_crit(28, 2)
+    k = canary_items_for_power(OLD, LENIENT, 0.6, z_crit)
+    assert canary_detection_prob(OLD, LENIENT, 0.6, k, z_crit) >= 0.8
+    assert canary_detection_prob(OLD, LENIENT, 0.6, k - 1, z_crit) < 0.8
+    with pytest.raises(ValueError):
+        canary_items_for_power(OLD, OLD, 0.6, z_crit)
+
+
+def test_canary_alarm_rates():
+    rng = np.random.default_rng(25)
+
+    def rate(drift, arms, n=400):
+        return np.mean([canary_alarm([simulate_canary(drift, a, n, 0.6, 28, 0.0, rng)
+                                      for a in arms]) is not None for _ in range(150)])
+
+    assert rate(S_NONE, "tc") < 0.08
+    assert rate(S_QUALITY, "tc") < 0.08
+    assert rate(S_T_STEP, "tc") > 0.8
+    # A canary built only from control outputs can't see treatment-only drift.
+    assert rate(S_T_STEP, "c", 800) < 0.08
+
+
+def test_canary_validation():
+    rng = np.random.default_rng(0)
+    with pytest.raises(ValueError):
+        simulate_canary(S_NONE, "t", 10, 0.6, 28, 1.5, rng)
+    with pytest.raises(ValueError):
+        canary_z(np.zeros((10, 13)))
