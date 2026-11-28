@@ -175,6 +175,8 @@ The script uses a fixed seed and writes [`docs/canary_drift_results.md`](docs/ca
 - Unlike the score monitors, it stayed quiet when true quality fell and the judge didn't change.
 - A canary built only from control outputs missed drift that affected only treatment outputs. The canary has to contain outputs from every arm.
 - Closed forms give the canary size for a target detection probability (`canary_items_for_power`).
+
+Write-up, with the decision rule: [A canary set catches a drifting judge without blaming real quality changes](https://github.com/wavde/wavde/blob/main/writing/canary-set-judge-drift.md).
 ## Generated creatives picked by a bandit
 
 Generative tools make it cheap to test 20 or 50 creative variants at once, and a bandit moves traffic toward whichever is ahead. How far is the leader's reported lift from its true lift, and which estimate from the logged decisions can be trusted? `bandit_eval` provides off-policy estimators that use the logged allocation probabilities (IPS, self-normalised IPS, doubly robust), the naive dashboard comparison, and a minimal batched Thompson-sampling log generator with known ground truth. It evaluates bandit logs; it is not a bandit framework.
