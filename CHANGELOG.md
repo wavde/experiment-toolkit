@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-27
+
 ### Added
 - `judge_audit`: real-data audit of an LLM judge against expert human
   judgments on MT-Bench (Zheng et al., 2023, CC BY 4.0), downloaded at runtime
@@ -84,6 +86,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/llm_judge_results.md` and `docs/llm_judge.png`, with every simulated
   number shown next to its closed-form value. Known-answer and Type-I tests
   live in `tests/test_llm_judge.py`.
+
+### Changed
+- **Breaking:** `msprt_cuped_pvalue` now requires `tau`. The old default, the
+  SD of the CUPED-adjusted outcome, made the mixing prior data-dependent and
+  broke the always-valid guarantee. Choose `tau` before the test, for example
+  from the minimum detectable effect.
+- **Breaking:** `e_value(kind="or", rare=False)` now requires `p0`, the
+  baseline outcome risk in the unexposed group, instead of assuming
+  `p0 = 0.1`.
+- `e_value` accepts a signed SMD, so a negative `d` is treated as protective
+  instead of being rejected.
+- Ships a `py.typed` marker (PEP 561).
+
+### Fixed
+- `e_value` handles protective effects and uses the CI bound closest to the
+  null (lower bound when RR > 1, upper bound when RR < 1).
+- `cs_did`: bootstrap replicates stay aligned across (g, t) cells, which fixes
+  invalid event-study and overall standard errors. Panels whose cohort varies
+  within a unit are now rejected.
+- `msprt_cuped_pvalue` validates equal arm lengths and `0 < n_per_arm <= min(len)`.
+- `mde_for_n` validates `alpha` and `power`; CUPED requires `|rho| < 1` and
+  validates input shapes, lengths and finiteness.
+- The Rosenbaum bounds docstring now says the Wilcoxon p-value is a normal
+  approximation, not the exact small-sample value.
 
 ## [0.2.0] - 2026-04-19
 
