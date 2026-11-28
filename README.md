@@ -229,6 +229,8 @@ The data (about 1.4 MB) are downloaded on first run from a pinned revision, chec
 - In a known-answer check that resamples the real verdicts, with 200 human labels per pair, PPI++ kept 93–96% coverage. The judge alone covered the truth in at most 0.5% of replications in 13 of 15 pairs, and at most 44% in the other two.
 - The real judge correlates with humans far less than the simulated judges assumed (0.14–0.56 against 0.69), so PPI++ saved only 2–28% of labels.
 
+Write-up, with the decision rule: [A real LLM judge favours the winner: auditing GPT-4 against expert humans](https://github.com/wavde/wavde/blob/main/writing/real-judge-audit-mt-bench.md).
+
 ## Out of scope
 
 Not in this package: a bandit framework (`bandit_eval` only evaluates logged bandit traffic; its simulator is a minimal test fixture), a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
