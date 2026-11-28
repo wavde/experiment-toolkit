@@ -33,3 +33,4 @@ jobs:
           python scripts/ppi_covariates_sim.py --smoke
           python scripts/judge_drift_sim.py --smoke
           python scripts/silent_drift_sim.py --smoke
+          python scripts/bandit_eval_sim.py --smoke

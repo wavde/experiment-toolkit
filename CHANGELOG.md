@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   labels, and the chance that one monitor check flags.
 - `scripts/silent_drift_sim.py`: seeded, single-command simulation that writes
   `docs/silent_drift_results.md` and `docs/silent_drift.png`. CI smoke-runs it.
+- `bandit_eval`: measuring the lift of a creative that a bandit picked from
+  many generated variants. Off-policy estimators that use logged propensities
+  (`ope_lift` with IPS, SNIPS or doubly robust; `policy_terms`), the naive
+  dashboard comparison (`naive_lift`), a selection helper (`pick_winner`), a
+  minimal batched Thompson-sampling log generator with click-rate drift and an
+  optional evaluation slice whose outcomes the bandit never sees
+  (`simulate_bandit_log`), and a closed-form winner's-curse reference for a
+  fixed equal split (`expected_winner_bias_fixed`). Evaluation only; still no
+  bandit framework.
+- `scripts/bandit_eval_sim.py`: seeded, single-command simulation that writes
+  `docs/bandit_eval_results.md` and `docs/bandit_eval.png`. CI smoke-runs it.
 - `judge_drift`: a judge model upgraded mid-test. Simulates a switch to a new
   judge (with per-arm error rates) partway through an A/B test, and compares
   the pooled judge score, the pre-upgrade judge score, and PPI++ with labels

@@ -9,7 +9,7 @@
 
 ![hero](https://raw.githubusercontent.com/wavde/experiment-toolkit/main/docs/hero.png)
 
-A compact Python package covering the calculations that come up in everyday experimentation work: sample sizing, variance reduction, sequential tests, ratio-metric variance, staggered DiD, sensitivity analysis for observational designs, and A/B metrics scored by an LLM judge. The implementations follow standard results from the experimentation and causal-inference literature (referenced in the docstrings and below).
+A compact Python package covering the calculations that come up in everyday experimentation work: sample sizing, variance reduction, sequential tests, ratio-metric variance, staggered DiD, sensitivity analysis for observational designs, A/B metrics scored by an LLM judge, and honest lift estimates for creatives picked by a bandit. The implementations follow standard results from the experimentation and causal-inference literature (referenced in the docstrings and below).
 
 Intended audience: analysts, data scientists, and experimentation platform engineers who want a small, inspectable reference implementation rather than a framework.
 
@@ -27,6 +27,7 @@ Intended audience: analysts, data scientists, and experimentation platform engin
 | `offline_eval` | Offline LLM evals vs online A/B: mix shift, judge bias and online-only costs, with reweighting and PPI++ fixes |
 | `ppi_covariates` | PPI++ plus a pre-treatment covariate (CUPED-style): closed-form label budgets and when the covariate stops helping |
 | `judge_drift` | A judge that changes mid-test, flagged or silent: which analyses stay valid, why front-loaded human labels don't, and what cheap drift monitors can and can't detect |
+| `bandit_eval` | Lift of a creative a bandit picked from many generated variants: winner's curse, time confounding, and off-policy (IPS / SNIPS / DR) estimates from logged propensities |
 
 The public API is typed (the package ships a `py.typed` marker) and unit-tested, and the key methods cite their source in the module docstrings.
 
@@ -160,9 +161,44 @@ The script uses a fixed seed and writes [`docs/silent_drift_results.md`](docs/si
 
 Write-up, with the decision rule: [When the judge drifts silently, random labels protect the readout and monitors only tell you where to look](https://github.com/wavde/wavde/blob/main/writing/silent-judge-drift.md).
 
+## Generated creatives picked by a bandit
+
+Generative tools make it cheap to test 20 or 50 creative variants at once, and a bandit moves traffic toward whichever is ahead. How far is the leader's reported lift from its true lift, and which estimate from the logged decisions can be trusted? `bandit_eval` provides off-policy estimators that use the logged allocation probabilities (IPS, self-normalised IPS, doubly robust), the naive dashboard comparison, and a minimal batched Thompson-sampling log generator with known ground truth. It evaluates bandit logs; it is not a bandit framework.
+
+```bash
+python scripts/bandit_eval_sim.py
+```
+
+The script uses a fixed seed and writes [`docs/bandit_eval_results.md`](docs/bandit_eval_results.md) and [`docs/bandit_eval.png`](docs/bandit_eval.png). It takes about 30 minutes.
+
+Two biases are at work, and they need different fixes:
+
+- **Time confounding.** A variant that wins traffic late is measured on late traffic. With click rates drifting ±20% over the test and no variant better than control, the leader's raw lift averages +12.6% and every replication claims a win. IPS, SNIPS and DR with the logged propensities remove this part.
+- **Winner's curse.** The leader was chosen because its estimate was high. IPS on the same log still overstates it: by +4.6 pp with 20 null variants (about 22% false wins at a nominal 2.5%), and DR on the same log by +8.0 pp with 50. When variant lifts are spread around zero (SD 4%) and clicks drift, the leader's true lift is +5.7% while the same-log IPS estimate is +7.7% and the raw lift +16.3%.
+
+What the simulation shows about the fixes:
+
+- **Splitting the log after the fact doesn't work.** The bandit allocated traffic using both halves, so the held-out half is biased (here downward) and the variant it picks is worse.
+- **Data the bandit never learned from does.** A 20% evaluation slice that the bandit serves but never updates on, and a 50k-per-arm confirmation A/B, are both unbiased with 94–96% coverage. The slice barely hurts the pick, but its SE is 2.3–2.8× the confirmation test's at a similar impression count, because most of its traffic went to variants that lost.
+
+Decision rule: let the bandit choose, but quote the lift only from impressions it didn't learn from. Run a short confirmation A/B when the number feeds a ship or forecast decision. If no extra time is available, reserve an evaluation slice from day one and log propensities with a floor, and treat it as a check on direction and rough size. Never report the leader's raw lift, and don't treat IPS on the same log as a fix for the winner's curse.
+
+```python
+from experiment_toolkit.bandit_eval import ope_lift
+
+# One row per impression: arm shown (0 = control), click, logged probability of that arm.
+# Rows from the evaluation slice only, for the leader chosen on the other rows.
+res = ope_lift(arms[slice_], clicks[slice_], propensity[slice_], target=leader, control=0)
+res.estimate, res.ci()
+```
+
+Where this breaks: with two to five variants the same-log overstatement is under 2 pp, so the extra machinery buys little. A thin propensity floor (≤1% of variant traffic) drops the slice's coverage to 0.91–0.93. Lifts are held constant over time; if generated creatives have a novelty effect that fades, no estimate from the test window measures the post-launch lift, and only a later confirmation test does.
+
+Write-up: [Classic case studies, reread in 2026](https://github.com/wavde/wavde/blob/main/writing/classic-case-studies-reread-2026.md).
+
 ## Out of scope
 
-Not in this package: a bandit framework, a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
+Not in this package: a bandit framework (`bandit_eval` only evaluates logged bandit traffic; its simulator is a minimal test fixture), a Bayesian posterior sampler, a full experimentation platform, assignment or exposure logging, multiple-comparison correction beyond what the sequential tests provide. Those belong in separate layers.
 
 ## Development
 
@@ -183,6 +219,11 @@ ruff check .
 - Angelopoulos, Bates, Fannjiang, Jordan, Zrnic (2023). Prediction-powered inference.
 - Angelopoulos, Duchi, Zrnic (2023). PPI++: Efficient prediction-powered inference.
 - Chaganty, Mussmann, Liang (2018). The price of debiasing automatic metrics in natural language evaluation.
+- Dudík, Langford, Li (2011). Doubly robust policy evaluation and learning.
+- Swaminathan & Joachims (2015). The self-normalized estimator for counterfactual learning.
+- Nie, Tian, Taylor, Zou (2018). Why adaptively collected data have negative bias and how to correct for it.
+- Hadad, Hirshberg, Zhan, Wager, Athey (2021). Confidence intervals for policy evaluation in adaptive experiments.
+- Andrews, Kitagawa, McCloskey (2024). Inference on winners.
 
 ## License
 
