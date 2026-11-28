@@ -35,3 +35,4 @@ jobs:
           python scripts/silent_drift_sim.py --smoke
           python scripts/bandit_eval_sim.py --smoke
           python scripts/canary_drift_sim.py --smoke
+          python scripts/judge_audit_mtbench.py --smoke
